@@ -21,6 +21,7 @@ typedef struct {
 static XdgAppCommand commands[] = {
   { "add-repo", xdg_app_builtin_add_repo },
   { "delete-repo", xdg_app_builtin_delete_repo },
+  { "list-repos", xdg_app_builtin_list_repos },
   { "install-runtime", xdg_app_builtin_install_runtime },
   { "update-runtime", xdg_app_builtin_update_runtime },
   { "install-app", xdg_app_builtin_install_app },
@@ -151,6 +152,14 @@ xdg_app_option_context_parse (GOptionContext *context,
   success = TRUE;
  out:
   return success;
+}
+
+void
+usage_error (GOptionContext *context, const char *message, GError **error)
+{
+  gs_free gchar *help = g_option_context_get_help (context, TRUE, NULL);
+  g_printerr ("%s", help);
+  g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_FAILED, message);
 }
 
 int
