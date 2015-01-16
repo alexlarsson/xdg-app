@@ -39,6 +39,7 @@
 #include <sys/syscall.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <libgen.h>
 
 #if 0
 #define __debug__(x) printf x
@@ -260,7 +261,8 @@ static const create_table_t create[] = {
   { FILE_TYPE_SYSTEM_SYMLINK, "lib", 0755, "usr/lib"},
   { FILE_TYPE_SYSTEM_SYMLINK, "bin", 0755, "usr/bin" },
   { FILE_TYPE_SYSTEM_SYMLINK, "sbin", 0755, "usr/sbin"},
-  { FILE_TYPE_SYSTEM_SYMLINK, "etc", 0755, "usr/etc"},
+  { FILE_TYPE_DIR, "etc", 0755 },
+  { FILE_TYPE_BIND_RO, "etc", 0755, "/etc" },
   { FILE_TYPE_DIR, "tmp/.X11-unix", 0755 },
   { FILE_TYPE_REGULAR, "tmp/.X11-unix/X99", 0755 },
   { FILE_TYPE_DIR, "proc", 0755},
@@ -285,8 +287,6 @@ static const create_table_t create[] = {
 };
 
 static const create_table_t create_post[] = {
-  { FILE_TYPE_BIND, "usr/etc/machine-id", 0444, "/etc/machine-id", FILE_FLAGS_NON_FATAL},
-  { FILE_TYPE_BIND, "usr/etc/machine-id", 0444, "/var/lib/dbus/machine-id", FILE_FLAGS_NON_FATAL | FILE_FLAGS_IF_LAST_FAILED},
 };
 
 static const mount_table_t mount_table[] = {
@@ -337,7 +337,8 @@ bind_mount (const char *src, const char *dest, bind_option_t options)
 static int
 mkdir_with_parents (const char *pathname,
                     int         mode,
-                    int         uid)
+                    uid_t       uid,
+                    gid_t       gid)
 {
   char *fn, *p;
   struct stat buf;
@@ -373,7 +374,7 @@ mkdir_with_parents (const char *pathname,
               errno = errsave;
               return -1;
             }
-          if (chown (fn, uid, -1))
+          if (chown (fn, uid, gid))
             return -1;
         }
       else if (!S_ISDIR (buf.st_mode))
@@ -619,6 +620,8 @@ create_homedir (int do_mount)
 {
   const char *home;
   const char *relative_home;
+  char *rel_home_copy;
+  const char *slash_home;
 
   home = getenv("HOME");
   if (home == NULL)
@@ -628,7 +631,13 @@ create_homedir (int do_mount)
   while (*relative_home == '/')
     relative_home++;
 
-  if (mkdir_with_parents (relative_home, 0700, getuid()))
+  rel_home_copy = xstrdup (relative_home);
+  slash_home = dirname (rel_home_copy);
+  if (mkdir_with_parents (slash_home, 0755, geteuid(), getegid()))
+    die_with_error ("unable to create %s", slash_home);
+  free (rel_home_copy);
+
+  if (mkdir_with_parents (relative_home, 0700, getuid(), getgid()))
     die_with_error ("unable to create %s", relative_home);
 
   if (do_mount)
@@ -817,6 +826,7 @@ main (int argc,
   char *newroot;
   int pipefd[2];
   uid_t saved_euid;
+  uid_t saved_egid;
   pid_t pid;
   int system_mode = 0;
   char *runtime_path = NULL;
@@ -998,6 +1008,10 @@ main (int argc,
   if (seteuid (saved_euid))
     die_with_error ("seteuid to privileged");
 
+  saved_egid = getegid ();
+  if (setegid (0))
+    die_with_error ("setegid to privileged");
+
   /* We want to make the temp directory a bind mount so that
      we can ensure that it is MS_PRIVATE, so mount don't leak out
      of the namespace, and also so that pivot_root() succeeds. However
@@ -1097,12 +1111,6 @@ main (int argc,
   /* /usr now mounted private inside the namespace, tell child process to unmount the tmpfs in the parent namespace. */
   close (pipefd[WRITE_END]);
 
-  if (bind_mount ("/etc/passwd", "etc/passwd", BIND_READONLY))
-    die_with_error ("mount passwd");
-
-  if (bind_mount ("/etc/group", "etc/group", BIND_READONLY))
-    die_with_error ("mount group");
-
   /* Bind mount in X socket
    * This is a bit iffy, as Xlib typically uses abstract unix domain sockets
    * to connect to X, but that is not namespaced. We instead set DISPLAY=99
@@ -1200,6 +1208,7 @@ main (int argc,
   umask (old_umask);
 
   /* Now we have everything we need CAP_SYS_ADMIN for, so drop setuid */
+  setgid (saved_egid);
   setuid (getuid ());
 
   chdir (old_cwd);
@@ -1208,6 +1217,7 @@ main (int argc,
   xsetenv ("LD_LIBRARY_PATH", "/self/lib", 1);
   xsetenv ("XDG_CONFIG_DIRS","/self/etc/xdg:/etc/xdg", 1);
   xsetenv ("XDG_DATA_DIRS", "/self/share:/usr/share", 1);
+  xsetenv ("GI_TYPELIB_PATH", "/self/lib/girepository-1.0", 1);
   xdg_runtime_dir = strdup_printf ("/run/user/%d", getuid());
   xsetenv ("XDG_RUNTIME_DIR", xdg_runtime_dir, 1);
   free (xdg_runtime_dir);
