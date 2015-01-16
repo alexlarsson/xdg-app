@@ -260,7 +260,8 @@ static const create_table_t create[] = {
   { FILE_TYPE_SYSTEM_SYMLINK, "lib", 0755, "usr/lib"},
   { FILE_TYPE_SYSTEM_SYMLINK, "bin", 0755, "usr/bin" },
   { FILE_TYPE_SYSTEM_SYMLINK, "sbin", 0755, "usr/sbin"},
-  { FILE_TYPE_SYSTEM_SYMLINK, "etc", 0755, "usr/etc"},
+  { FILE_TYPE_DIR, "etc", 0755 },
+  { FILE_TYPE_BIND_RO, "etc", 0755, "/etc" },
   { FILE_TYPE_DIR, "tmp/.X11-unix", 0755 },
   { FILE_TYPE_REGULAR, "tmp/.X11-unix/X99", 0755 },
   { FILE_TYPE_DIR, "proc", 0755},
@@ -285,8 +286,6 @@ static const create_table_t create[] = {
 };
 
 static const create_table_t create_post[] = {
-  { FILE_TYPE_BIND, "usr/etc/machine-id", 0444, "/etc/machine-id", FILE_FLAGS_NON_FATAL},
-  { FILE_TYPE_BIND, "usr/etc/machine-id", 0444, "/var/lib/dbus/machine-id", FILE_FLAGS_NON_FATAL | FILE_FLAGS_IF_LAST_FAILED},
 };
 
 static const mount_table_t mount_table[] = {
@@ -1096,12 +1095,6 @@ main (int argc,
 
   /* /usr now mounted private inside the namespace, tell child process to unmount the tmpfs in the parent namespace. */
   close (pipefd[WRITE_END]);
-
-  if (bind_mount ("/etc/passwd", "etc/passwd", BIND_READONLY))
-    die_with_error ("mount passwd");
-
-  if (bind_mount ("/etc/group", "etc/group", BIND_READONLY))
-    die_with_error ("mount group");
 
   /* Bind mount in X socket
    * This is a bit iffy, as Xlib typically uses abstract unix domain sockets
