@@ -39,6 +39,7 @@
 #include <sys/syscall.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <libgen.h>
 
 #if 0
 #define __debug__(x) printf x
@@ -336,7 +337,8 @@ bind_mount (const char *src, const char *dest, bind_option_t options)
 static int
 mkdir_with_parents (const char *pathname,
                     int         mode,
-                    int         uid)
+                    uid_t       uid,
+                    gid_t       gid)
 {
   char *fn, *p;
   struct stat buf;
@@ -372,7 +374,7 @@ mkdir_with_parents (const char *pathname,
               errno = errsave;
               return -1;
             }
-          if (chown (fn, uid, -1))
+          if (chown (fn, uid, gid))
             return -1;
         }
       else if (!S_ISDIR (buf.st_mode))
@@ -618,6 +620,8 @@ create_homedir (int do_mount)
 {
   const char *home;
   const char *relative_home;
+  char *rel_home_copy;
+  const char *slash_home;
 
   home = getenv("HOME");
   if (home == NULL)
@@ -627,7 +631,13 @@ create_homedir (int do_mount)
   while (*relative_home == '/')
     relative_home++;
 
-  if (mkdir_with_parents (relative_home, 0700, getuid()))
+  rel_home_copy = xstrdup (relative_home);
+  slash_home = dirname (rel_home_copy);
+  if (mkdir_with_parents (slash_home, 0755, geteuid(), getegid()))
+    die_with_error ("unable to create %s", slash_home);
+  free (rel_home_copy);
+
+  if (mkdir_with_parents (relative_home, 0700, getuid(), getgid()))
     die_with_error ("unable to create %s", relative_home);
 
   if (do_mount)
@@ -816,6 +826,7 @@ main (int argc,
   char *newroot;
   int pipefd[2];
   uid_t saved_euid;
+  uid_t saved_egid;
   pid_t pid;
   int system_mode = 0;
   char *runtime_path = NULL;
@@ -996,6 +1007,10 @@ main (int argc,
   /* Now switch back to the root user */
   if (seteuid (saved_euid))
     die_with_error ("seteuid to privileged");
+
+  saved_egid = getegid ();
+  if (setegid (0))
+    die_with_error ("setegid to privileged");
 
   /* We want to make the temp directory a bind mount so that
      we can ensure that it is MS_PRIVATE, so mount don't leak out
@@ -1193,6 +1208,7 @@ main (int argc,
   umask (old_umask);
 
   /* Now we have everything we need CAP_SYS_ADMIN for, so drop setuid */
+  setgid (saved_egid);
   setuid (getuid ());
 
   chdir (old_cwd);
