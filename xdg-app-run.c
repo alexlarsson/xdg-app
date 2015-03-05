@@ -366,6 +366,7 @@ xdg_app_run_in_transient_unit (const char *appid)
   char *job = NULL;
   SystemdManager *manager = NULL;
   GVariantBuilder builder;
+  GVariantBuilder device_builder;
   GVariant *properties = NULL;
   GVariant *aux = NULL;
   guint32 pid;
@@ -417,6 +418,16 @@ xdg_app_run_in_transient_unit (const char *appid)
                          g_variant_new_fixed_array (G_VARIANT_TYPE ("u"),
                                                     &pid, 1, sizeof (guint32))
                          );
+
+  g_variant_builder_add (&builder, "(sv)",
+                         "DevicePolicy",
+                         g_variant_new_string ("closed"));
+
+  g_variant_builder_init (&device_builder, G_VARIANT_TYPE ("a(ss)"));
+  g_variant_builder_add (&device_builder, "(ss)",
+                         "char-drm", "rw");
+  g_variant_builder_add (&builder, "(sv)",
+                         "DeviceAllow", g_variant_builder_end (&device_builder));
 
   properties = g_variant_builder_end (&builder);
 
