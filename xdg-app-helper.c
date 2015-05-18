@@ -437,8 +437,6 @@ static const create_table_t create[] = {
   { FILE_TYPE_DIR, "dev", 0755},
   { FILE_TYPE_MOUNT, "dev"},
   { FILE_TYPE_DIR, "dev/pts", 0755},
-  /* TODO: We can't mount devpts if root is not mounted in the user namespace, needs a kernel patch */
-  /* { FILE_TYPE_MOUNT, "dev/pts"}, */
   { FILE_TYPE_BIND, "dev/pts", 0755, "/dev/pts", FILE_FLAGS_NOREMOUNT},
   { FILE_TYPE_DIR, "dev/shm", 0755},
   { FILE_TYPE_SHM, "dev/shm"},
@@ -463,10 +461,10 @@ static const create_table_t create_post[] = {
   { FILE_TYPE_BIND_RO, "etc/resolv.conf", 0444, "/etc/resolv.conf", 0, &bind_resolv_conf},
 };
 
-static const mount_table_t mount_table[] = {
+static mount_table_t mount_table[] = {
   { "proc",      "proc",     "proc",  NULL,        MS_NOSUID|MS_NOEXEC|MS_NODEV           },
   { "tmpfs",     "dev",      "tmpfs", "mode=755",  MS_NOSUID|MS_STRICTATIME               },
-  { "devpts",    "dev/pts",  "devpts","newinstance,ptmxmode=0666,mode=620,gid=5", MS_NOSUID|MS_NOEXEC },
+  { "devpts",    "dev/pts",  "devpts","newinstance,ptmxmode=0666,mode=620,ptmxuid=%d,ptmxgid=%d", MS_NOSUID|MS_NOEXEC },
   { "tmpfs",     "dev/shm",  "tmpfs", "mode=1777", MS_NOSUID|MS_NODEV|MS_STRICTATIME      },
 };
 
@@ -1684,6 +1682,14 @@ main (int argc,
 
   if (chdir (newroot) != 0)
       die_with_error ("chdir");
+
+  for (i = 0; i < N_ELEMENTS (mount_table); i++)
+    {
+      if (strcmp (mount_table[i].what, "devpts") == 0)
+        {
+          mount_table[i].options = strdup_printf (mount_table[i].options, getuid(), getgid());
+        }
+    }
 
   create_files (create, N_ELEMENTS (create), share_shm, runtime_path);
 
