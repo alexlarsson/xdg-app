@@ -31,6 +31,7 @@ xdg-app-helper
 xdg-app-session-helper
 xdg-document-portal
 xdg-app-builder
+xdg-desktop-portal
 testdb
 doc/*.1
 *~
@@ -66,3 +67,5 @@ XdgApp-1.0.*
 /tests/hello*.xdgapp
 /tests/platform*.xdgapp
 /tests/repo
+data/*Backend.xml
+desktop-portal/xdg-desktop-resources.c

@@ -1957,6 +1957,9 @@ static void
 add_default_permissions (XdgAppContext *app_context)
 {
   xdg_app_context_set_session_bus_policy (app_context,
+                                          "org.freedesktop.portal.Desktop",
+                                          XDG_APP_POLICY_TALK);
+  xdg_app_context_set_session_bus_policy (app_context,
                                           "org.freedesktop.portal.Documents",
                                           XDG_APP_POLICY_TALK);
 }
