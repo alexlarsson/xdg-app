@@ -174,6 +174,36 @@ if test x$enable_documentation = xyes; then
 fi
 AM_CONDITIONAL(BUILD_DOCUMENTATION, test x$enable_documentation = xyes)
 
+##################################################
+# Visibility handling
+##################################################
+
+HIDDEN_VISIBILITY_CFLAGS=""
+case "$host" in
+  *)
+    dnl on other compilers, check if we can do -fvisibility=hidden
+    SAVED_CFLAGS="${CFLAGS}"
+    CFLAGS="-fvisibility=hidden"
+    AC_MSG_CHECKING([for -fvisibility=hidden compiler flag])
+    AC_TRY_COMPILE([], [int main (void) { return 0; }],
+                   AC_MSG_RESULT(yes)
+                   enable_fvisibility_hidden=yes,
+                   AC_MSG_RESULT(no)
+                   enable_fvisibility_hidden=no)
+    CFLAGS="${SAVED_CFLAGS}"
+
+    AS_IF([test "${enable_fvisibility_hidden}" = "yes"], [
+      AC_DEFINE([XDG_APP_EXTERN], [__attribute__((visibility("default"))) extern],
+                [defines how to decorate public symbols while building])
+      HIDDEN_VISIBILITY_CFLAGS="-fvisibility=hidden"
+    ], [
+      AC_DEFINE([XDG_APP_EXTERN], [extern],
+                [defines how to decorate public symbols while building])
+    ])
+    ;;
+esac
+AC_SUBST(HIDDEN_VISIBILITY_CFLAGS)
+
 AC_CONFIG_FILES([
 Makefile
 doc/Makefile
