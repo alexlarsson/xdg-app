@@ -965,8 +965,17 @@ builder_manifest_cleanup (BuilderManifest *self,
         {
           g_autoptr(GFile) icons_dir = g_file_resolve_relative_path (app_root, "share/icons");
 
-          if (!foreach_file (self, rename_icon_cb, icons_dir, error))
+          GError *error_foreach = NULL;
+          if (!foreach_file (self, rename_icon_cb, icons_dir, &error_foreach)) {
+            char *path = g_file_get_path (icons_dir);
+            g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+              "foreach_file() failed with icons_dir path: %s with error: %s",
+              path, error_foreach->message);
+            g_free (path);
+            g_clear_error (&error_foreach);
+
             return FALSE;
+          }
         }
 
       if (self->rename_icon ||
