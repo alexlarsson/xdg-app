@@ -1,6 +1,23 @@
 AC_PREREQ([2.63])
 
-AC_INIT([xdg-app],[0.4.5])
+# Making releases:
+#   XDG_APP_MICRO_VERSION += 1;
+#   XDG_APP_INTERFACE_AGE += 1;
+#   XDG_APP_BINARY_AGE += 1;
+# if any functions have been added, set XDG_APP_INTERFACE_AGE to 0.
+# if backwards compatibility has been broken,
+# set XDG_APP_BINARY_AGE and XDG_APP_INTERFACE_AGE to 0.
+
+m4_define([xdg_app_major_version], [0])
+m4_define([xdg_app_minor_version], [4])
+m4_define([xdg_app_micro_version], [5])
+m4_define([xdg_app_interface_age], [0])
+m4_define([xdg_app_binary_age],
+          [m4_eval(100 * xdg_app_minor_version + xdg_app_micro_version)])
+m4_define([xdg_app_version],
+          [xdg_app_major_version.xdg_app_minor_version.xdg_app_micro_version])
+
+AC_INIT([xdg-app],[xdg_app_version])
 
 AC_USE_SYSTEM_EXTENSIONS
 
@@ -204,9 +221,36 @@ case "$host" in
 esac
 AC_SUBST(HIDDEN_VISIBILITY_CFLAGS)
 
+XDG_APP_MAJOR_VERSION=xdg_app_major_version
+XDG_APP_MINOR_VERSION=xdg_app_minor_version
+XDG_APP_MICRO_VERSION=xdg_app_micro_version
+XDG_APP_INTERFACE_AGE=xdg_app_interface_age
+XDG_APP_VERSION=xdg_app_version
+AC_SUBST(XDG_APP_MAJOR_VERSION)
+AC_SUBST(XDG_APP_MINOR_VERSION)
+AC_SUBST(XDG_APP_MICRO_VERSION)
+AC_SUBST(XDG_APP_INTERFACE_AGE)
+AC_SUBST(XDG_APP_VERSION)
+
+# libtool versioning
+#LT_RELEASE=$XDG_APP_MAJOR_VERSION.$XDG_APP_MINOR_VERSION
+#LT_CURRENT=`expr $XDG_APP_MICRO_VERSION - $XDG_APP_INTERFACE_AGE`
+#LT_REVISION=$XDG_APP_INTERFACE_AGE
+#LT_AGE=`expr $XDG_APP_BINARY_AGE - $XDG_APP_INTERFACE_AGE`
+#LT_CURRENT_MINUS_AGE=`expr $LT_CURRENT - $LT_AGE`
+
+m4_define([lt_current], [m4_eval(100 * xdg_app_minor_version + xdg_app_micro_version - xdg_app_interface_age)])
+m4_define([lt_revision], [xdg_app_interface_age])
+m4_define([lt_age], [m4_eval(xdg_app_binary_age - xdg_app_interface_age)])
+LT_VERSION_INFO="lt_current:lt_revision:lt_age"
+LT_CURRENT_MINUS_AGE=m4_eval(lt_current - lt_age)
+AC_SUBST(LT_VERSION_INFO)
+AC_SUBST(LT_CURRENT_MINUS_AGE)
+
 AC_CONFIG_FILES([
 Makefile
 doc/Makefile
 xdg-app.pc
+lib/xdg-app-version-macros.h
 ])
 AC_OUTPUT
