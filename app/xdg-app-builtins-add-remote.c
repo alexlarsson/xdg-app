@@ -168,6 +168,9 @@ xdg_app_builtin_add_remote (int argc, char **argv,
   remote_name = argv[1];
   url_or_path  = argv[2];
 
+  if (!import_keys (dir, remote_name, cancellable, error))
+    return FALSE;
+
   file = g_file_new_for_commandline_arg (url_or_path);
   if (g_file_is_native (file))
     remote_url = g_file_get_uri (file);
@@ -224,8 +227,7 @@ xdg_app_builtin_add_remote (int argc, char **argv,
         }
     }
 
-  if (!import_keys (dir, remote_name, cancellable, error))
-    return FALSE;
+
 
   return TRUE;
 }
