@@ -1,0 +1,736 @@
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:218: trace: Scanning source directory: ../../lib
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:316: trace: File ignored: ../../lib/xdg-app-remote-private.h
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:330: trace: Scanning ../../lib/xdg-app-error.h
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:415: trace: Found start of comment:  xdg-app-error.c
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Copyright (C) 2015 Red Hat, Inc
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * This file is free software; you can redistribute it and/or modify it
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * under the terms of the GNU Lesser General Public License as
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * published by the Free Software Foundation; either version 2 of the
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * License, or (at your option) any later version.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * This file is distributed in the hope that it will be useful, but
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * WITHOUT ANY WARRANTY; without even the implied warranty of
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Lesser General Public License for more details.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * You should have received a copy of the GNU Lesser General Public License
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Authors:
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *       Alexander Larsson <alexl@redhat.com>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  */
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #ifndef XDG_APP_ERROR_H
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define XDG_APP_ERROR_H
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:442: trace: skipping Macro: XDG_APP_ERROR_H
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #include <glib.h>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: G_BEGIN_DECLS
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:415: trace: Found start of comment: *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * XdpErrorEnum:
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  */
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: typedef enum {
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:509: trace: typedef enum: -
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0]   XDG_APP_ERROR_ALREADY_INSTALLED,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0]   XDG_APP_ERROR_NOT_INSTALLED,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0] } XdgAppError;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define XDG_APP_ERROR xdg_app_error_quark()
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:440: trace: Macro: XDG_APP_ERROR
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: GQuark  xdg_app_error_quark      (void);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:617: trace: Function (1): xdg_app_error_quark, Returns: [GQuark][  ]
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:781: trace: zzzFunction void);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:794: trace: Is this a get-type?: [GQuark   ] [xdg_app_error_quark] [void]
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: G_END_DECLS
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #endif /* XDG_APP_ERROR_H */
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:896: trace: Scanning ../../lib/xdg-app-error.h done
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:330: trace: Scanning ../../lib/xdg-app.h
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:415: trace: Found start of comment: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Copyright © 2015 Red Hat, Inc
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * This program is free software; you can redistribute it and/or
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * modify it under the terms of the GNU Lesser General Public
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * License as published by the Free Software Foundation; either
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * version 2 of the License, or (at your option) any later version.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * This library is distributed in the hope that it will be useful,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the GNU
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Lesser General Public License for more details.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * You should have received a copy of the GNU Lesser General Public
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * License along with this library. If not, see <http://www.gnu.org/licenses/>.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Authors:
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *       Alexander Larsson <alexl@redhat.com>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  */
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #ifndef __XDG_APP_H__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define __XDG_APP_H__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:442: trace: skipping Macro: __XDG_APP_H__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define __XDG_APP_H_INSIDE__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:442: trace: skipping Macro: __XDG_APP_H_INSIDE__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #include <gio/gio.h>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #include <xdg-app-version-macros.h>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #include <xdg-app-enum-types.h>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #include <xdg-app-error.h>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #include <xdg-app-ref.h>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #include <xdg-app-installed-ref.h>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #include <xdg-app-remote-ref.h>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #include <xdg-app-remote.h>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #include <xdg-app-installation.h>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #undef __XDG_APP_H_INSIDE__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #endif /* __XDG_APP_H__ */
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:896: trace: Scanning ../../lib/xdg-app.h done
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:330: trace: Scanning ../../lib/xdg-app-remote-ref.h
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:415: trace: Found start of comment: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Copyright © 2015 Red Hat, Inc
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * This program is free software; you can redistribute it and/or
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * modify it under the terms of the GNU Lesser General Public
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * License as published by the Free Software Foundation; either
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * version 2 of the License, or (at your option) any later version.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * This library is distributed in the hope that it will be useful,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the GNU
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Lesser General Public License for more details.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * You should have received a copy of the GNU Lesser General Public
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * License along with this library. If not, see <http://www.gnu.org/licenses/>.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Authors:
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *       Alexander Larsson <alexl@redhat.com>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  */
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #if !defined (__XDG_APP_H_INSIDE__) && !defined (XDG_APP_COMPILATION)
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #error "Only <xdg-app.h> can be included remote_refectly."
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #endif
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #ifndef __XDG_APP_REMOTE_REF_H__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define __XDG_APP_REMOTE_REF_H__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:442: trace: skipping Macro: __XDG_APP_REMOTE_REF_H__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: typedef struct XdgAppRemoteRef XdgAppRemoteRef;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:547: trace: Found struct/union(*) typedef XdgAppRemoteRef: typedef struct XdgAppRemoteRef XdgAppRemoteRef;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #include <gio/gio.h>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #include <xdg-app-ref.h>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define XDG_APP_TYPE_REMOTE_REF xdg_app_remote_ref_get_type()
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:440: trace: Macro: XDG_APP_TYPE_REMOTE_REF
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define XDG_APP_REMOTE_REF(obj) (G_TYPE_CHECK_INSTANCE_CAST ((obj), XDG_APP_TYPE_REMOTE_REF, XdgAppRemoteRef))
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:440: trace: Macro: XDG_APP_REMOTE_REF
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define XDG_APP_IS_REMOTE_REF(obj) (G_TYPE_CHECK_INSTANCE_TYPE ((obj), XDG_APP_TYPE_REMOTE_REF))
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:440: trace: Macro: XDG_APP_IS_REMOTE_REF
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN GType xdg_app_remote_ref_get_type (void);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: struct XdgAppRemoteRef {
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:710: trace: Struct(_): XdgAppRemoteRef
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:876: trace: struct/union level : 1
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0]   XdgAppRef parent;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:876: trace: struct/union level : 1
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0] };
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:861: trace: Store struct: XdgAppRemoteRef
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: typedef struct {
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:542: trace: typedef struct/union struct
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:876: trace: struct/union level : 1
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0]   XdgAppRefClass parent_class;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:876: trace: struct/union level : 1
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0] } XdgAppRemoteRefClass;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:857: trace: Found object: XdgAppRemoteRef
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:861: trace: Store struct: XdgAppRemoteRefClass
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN const char * xdg_app_remote_ref_get_remote_name (XdgAppRemoteRef *self);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: G_DEFINE_AUTOPTR_CLEANUP_FUNC(XdgAppRemoteRef, g_object_unref)
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #endif
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #endif /* __XDG_APP_REMOTE_REF_H__ */
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:896: trace: Scanning ../../lib/xdg-app-remote-ref.h done
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:915: trace: Found gobject type 'XDG_APP_REMOTE_REF' from is_ macro
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:935: trace:   Hide instance docs for xdg_appremoteref
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:939: trace:   Hide class docs for xdg_appremoteref
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:943: trace:   Hide iface docs for xdg_appremoteref
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:947: trace:   Hide iface docs for xdg_appremoteref
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:963: trace: Decl '<TITLE>XdgAppRemoteRef</TITLE>,XdgAppRemoteRef,XdgAppRemoteRefClass'
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:964: trace: Std  'XDG_APP_IS_REMOTE_REF,XDG_APP_TYPE_REMOTE_REF,XDG_APP_REMOTE_REF'
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:330: trace: Scanning ../../lib/xdg-app-version-macros.h
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:415: trace: Found start of comment: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Copyright © 2015 Red Hat, Inc
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * This program is free software; you can redistribute it and/or
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * modify it under the terms of the GNU Lesser General Public
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * License as published by the Free Software Foundation; either
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * version 2 of the License, or (at your option) any later version.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * This library is distributed in the hope that it will be useful,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the GNU
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Lesser General Public License for more details.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * You should have received a copy of the GNU Lesser General Public
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * License along with this library. If not, see <http://www.gnu.org/licenses/>.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Authors:
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *       Alexander Larsson <alexl@redhat.com>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  */
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #if !defined (__XDG_APP_H_INSIDE__) && !defined (XDG_APP_COMPILATION)
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #error "Only <xdg-app.h> can be included directly."
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #endif
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #ifndef __XDG_APP_VERSION_MACROS_H__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define __XDG_APP_VERSION_MACROS_H__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:442: trace: skipping Macro: __XDG_APP_VERSION_MACROS_H__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define XDG_APP_MAJOR_VERSION (0)
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:440: trace: Macro: XDG_APP_MAJOR_VERSION
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define XDG_APP_MINOR_VERSION (4)
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:440: trace: Macro: XDG_APP_MINOR_VERSION
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define XDG_APP_MICRO_VERSION (7)
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:440: trace: Macro: XDG_APP_MICRO_VERSION
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #ifndef XDG_APP_EXTERN
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define XDG_APP_EXTERN extern
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:440: trace: Macro: XDG_APP_EXTERN
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #endif
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #endif /* __XDG_APP_VERSION_MACROS_H__ */
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:896: trace: Scanning ../../lib/xdg-app-version-macros.h done
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:316: trace: File ignored: ../../lib/xdg-app-enum-types.h
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:330: trace: Scanning ../../lib/xdg-app-remote-ref-private.h
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:415: trace: Found start of comment: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Copyright © 2015 Red Hat, Inc
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * This program is free software; you can redistribute it and/or
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * modify it under the terms of the GNU Lesser General Public
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * License as published by the Free Software Foundation; either
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * version 2 of the License, or (at your option) any later version.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * This library is distributed in the hope that it will be useful,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the GNU
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Lesser General Public License for more details.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * You should have received a copy of the GNU Lesser General Public
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * License along with this library. If not, see <http://www.gnu.org/licenses/>.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Authors:
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *       Alexander Larsson <alexl@redhat.com>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  */
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #if !defined (__XDG_APP_H_INSIDE__) && !defined (XDG_APP_COMPILATION)
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #error "Only <xdg-app.h> can be included remote_refectly."
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #endif
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #ifndef __XDG_APP_REMOTE_REF_PRIVATE_H__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define __XDG_APP_REMOTE_REF_PRIVATE_H__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:442: trace: skipping Macro: __XDG_APP_REMOTE_REF_PRIVATE_H__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #include <xdg-app-remote-ref.h>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #include <xdg-app-dir.h>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XdgAppRemoteRef *xdg_app_remote_ref_new (const char *full_ref,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:617: trace: Function (1): xdg_app_remote_ref_new, Returns: [XdgAppRemoteRef][ *]
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:781: trace: zzzFunction const char *full_ref,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0]                                          const char *commit,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:781: trace: zzzFunction const char *full_ref,
+                                         const char *commit,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0]                                          const char *remote_name);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:781: trace: zzzFunction const char *full_ref,
+                                         const char *commit,
+                                         const char *remote_name);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:794: trace: Is this a get-type?: [XdgAppRemoteRef  *] [xdg_app_remote_ref_new] [const char *full_ref, const char *commit, const char *remote_name]
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #endif /* __XDG_APP_REMOTE_REF_PRIVATE_H__ */
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:896: trace: Scanning ../../lib/xdg-app-remote-ref-private.h done
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:330: trace: Scanning ../../lib/xdg-app-installation.h
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:415: trace: Found start of comment: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Copyright © 2015 Red Hat, Inc
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * This program is free software; you can redistribute it and/or
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * modify it under the terms of the GNU Lesser General Public
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * License as published by the Free Software Foundation; either
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * version 2 of the License, or (at your option) any later version.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * This library is distributed in the hope that it will be useful,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the GNU
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Lesser General Public License for more details.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * You should have received a copy of the GNU Lesser General Public
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * License along with this library. If not, see <http://www.gnu.org/licenses/>.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Authors:
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *       Alexander Larsson <alexl@redhat.com>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  */
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #if !defined (__XDG_APP_H_INSIDE__) && !defined (XDG_APP_COMPILATION)
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #error "Only <xdg-app.h> can be included installationectly."
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #endif
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #ifndef __XDG_APP_INSTALLATION_H__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define __XDG_APP_INSTALLATION_H__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:442: trace: skipping Macro: __XDG_APP_INSTALLATION_H__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: typedef struct XdgAppInstallation XdgAppInstallation;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:547: trace: Found struct/union(*) typedef XdgAppInstallation: typedef struct XdgAppInstallation XdgAppInstallation;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #include <gio/gio.h>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #include <xdg-app-installed-ref.h>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #include <xdg-app-remote.h>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define XDG_APP_TYPE_INSTALLATION xdg_app_installation_get_type()
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:440: trace: Macro: XDG_APP_TYPE_INSTALLATION
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define XDG_APP_INSTALLATION(obj) (G_TYPE_CHECK_INSTANCE_CAST ((obj), XDG_APP_TYPE_INSTALLATION, XdgAppInstallation))
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:440: trace: Macro: XDG_APP_INSTALLATION
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define XDG_APP_IS_INSTALLATION(obj) (G_TYPE_CHECK_INSTANCE_TYPE ((obj), XDG_APP_TYPE_INSTALLATION))
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:440: trace: Macro: XDG_APP_IS_INSTALLATION
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: GType xdg_app_installation_get_type (void);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:617: trace: Function (1): xdg_app_installation_get_type, Returns: [GType][ ]
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:781: trace: zzzFunction void);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:794: trace: Is this a get-type?: [GType  ] [xdg_app_installation_get_type] [void]
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:796: trace: Adding get-type: [GType  ] [xdg_app_installation_get_type] [void]	from ../../lib/xdg-app-installation.h
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: struct XdgAppInstallation {
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:710: trace: Struct(_): XdgAppInstallation
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:876: trace: struct/union level : 1
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0]   GObject parent;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:876: trace: struct/union level : 1
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0] };
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:861: trace: Store struct: XdgAppInstallation
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: typedef struct {
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:542: trace: typedef struct/union struct
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:876: trace: struct/union level : 1
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0]   GObjectClass parent_class;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:876: trace: struct/union level : 1
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0] } XdgAppInstallationClass;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:857: trace: Found object: XdgAppInstallation
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:861: trace: Store struct: XdgAppInstallationClass
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: typedef enum {
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:509: trace: typedef enum: -
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0]   XDG_APP_UPDATE_FLAGS_NONE      = 0,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0]   XDG_APP_UPDATE_FLAGS_NO_DEPLOY = (1<<0),
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0]   XDG_APP_UPDATE_FLAGS_NO_PULL   = (1<<1),
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0] } XdgAppUpdateFlags;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: G_DEFINE_AUTOPTR_CLEANUP_FUNC(XdgAppInstallation, g_object_unref)
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #endif
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN XdgAppInstallation *xdg_app_installation_new_system (GCancellable *cancellable,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                     GError **error);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN XdgAppInstallation *xdg_app_installation_new_user (GCancellable *cancellable,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                   GError **error);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN XdgAppInstallation *xdg_app_installation_new_for_path (GFile *path,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                       gboolean user,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                       GCancellable *cancellable,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                       GError **error);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: typedef void (*XdgAppProgressCallback)(const char *status,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:458: trace: user function (1): XdgAppProgressCallback, Returns: void 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0]                                        guint progress,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0]                                        gboolean estimating,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0]                                        gpointer user_data);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN gboolean             xdg_app_installation_get_is_user               (XdgAppInstallation  *self);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN gboolean             xdg_app_installation_launch                    (XdgAppInstallation  *self,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     const char          *name,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     const char          *arch,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     const char          *branch,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     const char          *commit,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     GCancellable        *cancellable,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     GError             **error);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN GFileMonitor        *xdg_app_installation_create_monitor            (XdgAppInstallation  *self,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     GCancellable        *cancellable,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     GError             **error);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN GPtrArray           *xdg_app_installation_list_installed_refs       (XdgAppInstallation  *self,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     GCancellable        *cancellable,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     GError             **error);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN GPtrArray           *xdg_app_installation_list_installed_refs_by_kind (XdgAppInstallation  *self,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     XdgAppRefKind        kind,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     GCancellable        *cancellable,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     GError             **error);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN GPtrArray           *xdg_app_installation_list_installed_refs_for_update (XdgAppInstallation  *self,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                          GCancellable        *cancellable,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                          GError             **error);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN XdgAppInstalledRef * xdg_app_installation_get_installed_ref         (XdgAppInstallation  *self,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     XdgAppRefKind        kind,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     const char          *name,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     const char          *arch,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     const char          *branch,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     GCancellable        *cancellable,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     GError             **error);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN XdgAppInstalledRef * xdg_app_installation_get_current_installed_app (XdgAppInstallation  *self,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     const char          *name,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     GCancellable        *cancellable,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     GError             **error);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN GPtrArray           *xdg_app_installation_list_remotes              (XdgAppInstallation  *self,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     GCancellable        *cancellable,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     GError             **error);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN char *              xdg_app_installation_load_app_overrides         (XdgAppInstallation *self,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     const char         *app_id,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     GCancellable       *cancellable,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     GError            **error);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN XdgAppInstalledRef * xdg_app_installation_install                   (XdgAppInstallation  *self,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     const char          *remote_name,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     XdgAppRefKind        kind,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     const char          *name,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     const char          *arch,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     const char          *branch,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     XdgAppProgressCallback  progress,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     gpointer             progress_data,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     GCancellable        *cancellable,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     GError             **error);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN XdgAppInstalledRef * xdg_app_installation_update                    (XdgAppInstallation  *self,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     XdgAppUpdateFlags    flags,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     XdgAppRefKind        kind,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     const char          *name,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     const char          *arch,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     const char          *branch,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     XdgAppProgressCallback  progress,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     gpointer             progress_data,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     GCancellable        *cancellable,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     GError             **error);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN gboolean             xdg_app_installation_uninstall                 (XdgAppInstallation  *self,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     XdgAppRefKind        kind,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     const char          *name,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     const char          *arch,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     const char          *branch,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     XdgAppProgressCallback  progress,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     gpointer             progress_data,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     GCancellable        *cancellable,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                     GError             **error);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN gboolean          xdg_app_installation_fetch_remote_size_sync     (XdgAppInstallation  *self,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   const char          *remote_name,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   const char          *commit,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   guint64             *download_size,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   guint64             *installed_size,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   GCancellable        *cancellable,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   GError             **error);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN GBytes        *   xdg_app_installation_fetch_remote_metadata_sync (XdgAppInstallation  *self,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   const char          *remote_name,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   const char          *commit,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   GCancellable        *cancellable,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   GError             **error);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN GPtrArray    *    xdg_app_installation_list_remote_refs_sync      (XdgAppInstallation  *self,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   const char          *remote_name,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   GCancellable        *cancellable,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   GError             **error);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN XdgAppRemoteRef  *xdg_app_installation_fetch_remote_ref_sync      (XdgAppInstallation  *self,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   const char          *remote_name,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   XdgAppRefKind        kind,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   const char          *name,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   const char          *arch,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   const char          *branch,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   GCancellable        *cancellable,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   GError             **error);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN gboolean          xdg_app_installation_update_appstream_sync      (XdgAppInstallation  *self,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   const char          *remote_name,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   const char          *arch,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   gboolean            *out_changed,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   GCancellable        *cancellable,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                                   GError             **error);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #endif /* __XDG_APP_INSTALLATION_H__ */
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:896: trace: Scanning ../../lib/xdg-app-installation.h done
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:915: trace: Found gobject type 'XDG_APP_INSTALLATION' from is_ macro
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:935: trace:   Hide instance docs for xdg_appinstallation
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:939: trace:   Hide class docs for xdg_appinstallation
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:943: trace:   Hide iface docs for xdg_appinstallation
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:947: trace:   Hide iface docs for xdg_appinstallation
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:963: trace: Decl '<TITLE>XdgAppInstallation</TITLE>,XdgAppInstallation,XdgAppInstallationClass,XdgAppUpdateFlags,XdgAppProgressCallback'
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:964: trace: Std  'XDG_APP_IS_INSTALLATION,XDG_APP_TYPE_INSTALLATION,xdg_app_installation_get_type,XDG_APP_INSTALLATION'
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:330: trace: Scanning ../../lib/xdg-app-remote.h
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:415: trace: Found start of comment: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Copyright © 2015 Red Hat, Inc
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * This program is free software; you can redistribute it and/or
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * modify it under the terms of the GNU Lesser General Public
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * License as published by the Free Software Foundation; either
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * version 2 of the License, or (at your option) any later version.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * This library is distributed in the hope that it will be useful,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the GNU
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Lesser General Public License for more details.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * You should have received a copy of the GNU Lesser General Public
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * License along with this library. If not, see <http://www.gnu.org/licenses/>.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Authors:
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *       Alexander Larsson <alexl@redhat.com>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  */
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #if !defined (__XDG_APP_H_INSIDE__) && !defined (XDG_APP_COMPILATION)
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #error "Only <xdg-app.h> can be included remoteectly."
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #endif
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #ifndef __XDG_APP_REMOTE_H__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define __XDG_APP_REMOTE_H__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:442: trace: skipping Macro: __XDG_APP_REMOTE_H__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: typedef struct XdgAppRemote XdgAppRemote;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:547: trace: Found struct/union(*) typedef XdgAppRemote: typedef struct XdgAppRemote XdgAppRemote;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #include <gio/gio.h>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #include <xdg-app-remote-ref.h>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define XDG_APP_TYPE_REMOTE xdg_app_remote_get_type()
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:440: trace: Macro: XDG_APP_TYPE_REMOTE
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define XDG_APP_REMOTE(obj) (G_TYPE_CHECK_INSTANCE_CAST ((obj), XDG_APP_TYPE_REMOTE, XdgAppRemote))
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:440: trace: Macro: XDG_APP_REMOTE
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define XDG_APP_IS_REMOTE(obj) (G_TYPE_CHECK_INSTANCE_TYPE ((obj), XDG_APP_TYPE_REMOTE))
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:440: trace: Macro: XDG_APP_IS_REMOTE
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN GType xdg_app_remote_get_type (void);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: struct XdgAppRemote {
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:710: trace: Struct(_): XdgAppRemote
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:876: trace: struct/union level : 1
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0]   GObject parent;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:876: trace: struct/union level : 1
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0] };
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:861: trace: Store struct: XdgAppRemote
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: typedef struct {
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:542: trace: typedef struct/union struct
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:876: trace: struct/union level : 1
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0]   GObjectClass parent_class;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:876: trace: struct/union level : 1
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0] } XdgAppRemoteClass;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:857: trace: Found object: XdgAppRemote
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:861: trace: Store struct: XdgAppRemoteClass
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: G_DEFINE_AUTOPTR_CLEANUP_FUNC(XdgAppRemote, g_object_unref)
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #endif
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN const char *  xdg_app_remote_get_name          (XdgAppRemote *self);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN GFile *       xdg_app_remote_get_appstream_dir (XdgAppRemote *self,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                const char   *arch);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN GFile *       xdg_app_remote_get_appstream_timestamp (XdgAppRemote *self,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                      const char   *arch);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN char *        xdg_app_remote_get_url           (XdgAppRemote *self);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN char *        xdg_app_remote_get_title         (XdgAppRemote *self);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN gboolean      xdg_app_remote_get_gpg_verify    (XdgAppRemote *self);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN gboolean      xdg_app_remote_get_noenumerate   (XdgAppRemote *self);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN int           xdg_app_remote_get_prio          (XdgAppRemote *self);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #endif /* __XDG_APP_REMOTE_H__ */
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:896: trace: Scanning ../../lib/xdg-app-remote.h done
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:915: trace: Found gobject type 'XDG_APP_REMOTE' from is_ macro
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:935: trace:   Hide instance docs for xdg_appremote
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:939: trace:   Hide class docs for xdg_appremote
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:943: trace:   Hide iface docs for xdg_appremote
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:947: trace:   Hide iface docs for xdg_appremote
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:963: trace: Decl '<TITLE>XdgAppRemote</TITLE>,XdgAppRemote,XdgAppRemoteClass'
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:964: trace: Std  'XDG_APP_IS_REMOTE,XDG_APP_TYPE_REMOTE,XDG_APP_REMOTE'
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:316: trace: File ignored: ../../lib/xdg-app-installed-ref-private.h
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:330: trace: Scanning ../../lib/xdg-app-installed-ref.h
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:415: trace: Found start of comment: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Copyright © 2015 Red Hat, Inc
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * This program is free software; you can redistribute it and/or
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * modify it under the terms of the GNU Lesser General Public
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * License as published by the Free Software Foundation; either
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * version 2 of the License, or (at your option) any later version.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * This library is distributed in the hope that it will be useful,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the GNU
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Lesser General Public License for more details.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * You should have received a copy of the GNU Lesser General Public
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * License along with this library. If not, see <http://www.gnu.org/licenses/>.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Authors:
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *       Alexander Larsson <alexl@redhat.com>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  */
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #if !defined (__XDG_APP_H_INSIDE__) && !defined (XDG_APP_COMPILATION)
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #error "Only <xdg-app.h> can be included installed_refectly."
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #endif
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #ifndef __XDG_APP_INSTALLED_REF_H__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define __XDG_APP_INSTALLED_REF_H__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:442: trace: skipping Macro: __XDG_APP_INSTALLED_REF_H__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: typedef struct XdgAppInstalledRef XdgAppInstalledRef;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:547: trace: Found struct/union(*) typedef XdgAppInstalledRef: typedef struct XdgAppInstalledRef XdgAppInstalledRef;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #include <gio/gio.h>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #include <xdg-app-ref.h>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define XDG_APP_TYPE_INSTALLED_REF xdg_app_installed_ref_get_type()
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:440: trace: Macro: XDG_APP_TYPE_INSTALLED_REF
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define XDG_APP_INSTALLED_REF(obj) (G_TYPE_CHECK_INSTANCE_CAST ((obj), XDG_APP_TYPE_INSTALLED_REF, XdgAppInstalledRef))
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:440: trace: Macro: XDG_APP_INSTALLED_REF
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define XDG_APP_IS_INSTALLED_REF(obj) (G_TYPE_CHECK_INSTANCE_TYPE ((obj), XDG_APP_TYPE_INSTALLED_REF))
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:440: trace: Macro: XDG_APP_IS_INSTALLED_REF
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN GType xdg_app_installed_ref_get_type (void);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: struct XdgAppInstalledRef {
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:710: trace: Struct(_): XdgAppInstalledRef
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:876: trace: struct/union level : 1
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0]   XdgAppRef parent;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:876: trace: struct/union level : 1
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0] };
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:861: trace: Store struct: XdgAppInstalledRef
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: typedef struct {
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:542: trace: typedef struct/union struct
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:876: trace: struct/union level : 1
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0]   XdgAppRefClass parent_class;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:876: trace: struct/union level : 1
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0] } XdgAppInstalledRefClass;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:857: trace: Found object: XdgAppInstalledRef
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:861: trace: Store struct: XdgAppInstalledRefClass
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: G_DEFINE_AUTOPTR_CLEANUP_FUNC(XdgAppInstalledRef, g_object_unref)
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #endif
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN const char *xdg_app_installed_ref_get_origin         (XdgAppInstalledRef  *self);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN guint64     xdg_app_installed_ref_get_installed_size (XdgAppInstalledRef  *self);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN const char *xdg_app_installed_ref_get_deploy_dir     (XdgAppInstalledRef  *self);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN const char *xdg_app_installed_ref_get_latest_commit  (XdgAppInstalledRef  *self);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN gboolean    xdg_app_installed_ref_get_is_current     (XdgAppInstalledRef  *self);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN char       *xdg_app_installed_ref_load_metadata      (XdgAppInstalledRef  *self,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                      GCancellable        *cancellable,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                                      GError             **error);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #endif /* __XDG_APP_INSTALLED_REF_H__ */
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:896: trace: Scanning ../../lib/xdg-app-installed-ref.h done
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:915: trace: Found gobject type 'XDG_APP_INSTALLED_REF' from is_ macro
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:935: trace:   Hide instance docs for xdg_appinstalledref
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:939: trace:   Hide class docs for xdg_appinstalledref
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:943: trace:   Hide iface docs for xdg_appinstalledref
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:947: trace:   Hide iface docs for xdg_appinstalledref
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:963: trace: Decl '<TITLE>XdgAppInstalledRef</TITLE>,XdgAppInstalledRef,XdgAppInstalledRefClass'
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:964: trace: Std  'XDG_APP_IS_INSTALLED_REF,XDG_APP_TYPE_INSTALLED_REF,XDG_APP_INSTALLED_REF'
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:330: trace: Scanning ../../lib/xdg-app-ref.h
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:415: trace: Found start of comment: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Copyright © 2015 Red Hat, Inc
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * This program is free software; you can redistribute it and/or
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * modify it under the terms of the GNU Lesser General Public
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * License as published by the Free Software Foundation; either
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * version 2 of the License, or (at your option) any later version.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * This library is distributed in the hope that it will be useful,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the GNU
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Lesser General Public License for more details.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * You should have received a copy of the GNU Lesser General Public
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * License along with this library. If not, see <http://www.gnu.org/licenses/>.
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  * Authors:
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  *       Alexander Larsson <alexl@redhat.com>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:343: trace: Comment:  */
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #if !defined (__XDG_APP_H_INSIDE__) && !defined (XDG_APP_COMPILATION)
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #error "Only <xdg-app.h> can be included refectly."
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #endif
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #ifndef __XDG_APP_REF_H__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define __XDG_APP_REF_H__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:442: trace: skipping Macro: __XDG_APP_REF_H__
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: typedef struct XdgAppRef XdgAppRef;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:547: trace: Found struct/union(*) typedef XdgAppRef: typedef struct XdgAppRef XdgAppRef;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #include <glib-object.h>
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define XDG_APP_TYPE_REF xdg_app_ref_get_type()
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:440: trace: Macro: XDG_APP_TYPE_REF
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define XDG_APP_REF(obj) (G_TYPE_CHECK_INSTANCE_CAST ((obj), XDG_APP_TYPE_REF, XdgAppRef))
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:440: trace: Macro: XDG_APP_REF
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #define XDG_APP_IS_REF(obj) (G_TYPE_CHECK_INSTANCE_TYPE ((obj), XDG_APP_TYPE_REF))
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:440: trace: Macro: XDG_APP_IS_REF
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN GType xdg_app_ref_get_type (void);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: struct XdgAppRef {
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:710: trace: Struct(_): XdgAppRef
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:876: trace: struct/union level : 1
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0]   GObject parent;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:876: trace: struct/union level : 1
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0] };
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:861: trace: Store struct: XdgAppRef
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: typedef struct {
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:542: trace: typedef struct/union struct
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:876: trace: struct/union level : 1
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0]   GObjectClass parent_class;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:876: trace: struct/union level : 1
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0] } XdgAppRefClass;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:857: trace: Found object: XdgAppRef
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:861: trace: Store struct: XdgAppRefClass
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: G_DEFINE_AUTOPTR_CLEANUP_FUNC(XdgAppRef, g_object_unref)
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #endif
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: typedef enum {
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:509: trace: typedef enum: -
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0]   XDG_APP_REF_KIND_APP,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0]   XDG_APP_REF_KIND_RUNTIME,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:726: trace: 1: [0] } XdgAppRefKind;
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN const char *  xdg_app_ref_get_name    (XdgAppRef      *self);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN const char *  xdg_app_ref_get_arch    (XdgAppRef      *self);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN const char *  xdg_app_ref_get_branch (XdgAppRef      *self);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN const char *  xdg_app_ref_get_commit  (XdgAppRef      *self);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN XdgAppRefKind xdg_app_ref_get_kind    (XdgAppRef      *self);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN char *        xdg_app_ref_format_ref  (XdgAppRef      *self);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: XDG_APP_EXTERN XdgAppRef *   xdg_app_ref_parse       (const char     *ref,
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0:                                                       GError        **error);
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: 
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:420: trace: 0: #endif /* __XDG_APP_REF_H__ */
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:896: trace: Scanning ../../lib/xdg-app-ref.h done
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:915: trace: Found gobject type 'XDG_APP_REF' from is_ macro
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:935: trace:   Hide instance docs for xdg_appref
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:939: trace:   Hide class docs for xdg_appref
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:943: trace:   Hide iface docs for xdg_appref
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:947: trace:   Hide iface docs for xdg_appref
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:963: trace: Decl '<TITLE>XdgAppRef</TITLE>,XdgAppRef,XdgAppRefClass,XdgAppRefKind'
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:964: trace: Std  'XDG_APP_IS_REF,XDG_APP_TYPE_REF,XDG_APP_REF'
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:218: trace: Scanning source directory: ../../lib
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:302: trace: File already scanned: ../../lib/xdg-app-remote-private.h
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:302: trace: File already scanned: ../../lib/xdg-app-error.h
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:302: trace: File already scanned: ../../lib/xdg-app.h
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:302: trace: File already scanned: ../../lib/xdg-app-remote-ref.h
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:302: trace: File already scanned: ../../lib/xdg-app-version-macros.h
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:302: trace: File already scanned: ../../lib/xdg-app-enum-types.h
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:302: trace: File already scanned: ../../lib/xdg-app-remote-ref-private.h
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:302: trace: File already scanned: ../../lib/xdg-app-installation.h
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:302: trace: File already scanned: ../../lib/xdg-app-remote.h
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:302: trace: File already scanned: ../../lib/xdg-app-installed-ref-private.h
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:302: trace: File already scanned: ../../lib/xdg-app-installed-ref.h
+/home/shared/gnome-jhbuild/bin/gtkdoc-scan:302: trace: File already scanned: ../../lib/xdg-app-ref.h
