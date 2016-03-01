@@ -1172,6 +1172,18 @@ write_xauth (char *number, FILE *output)
 #endif /* ENABLE_XAUTH */
 
 static void
+add_args (GPtrArray *argv_array, ...)
+{
+  va_list args;
+  const gchar *arg;
+
+  va_start (args, argv_array);
+  while ((arg = va_arg (args, const gchar *)))
+    g_ptr_array_add (argv_array, g_strdup (arg));
+  va_end (args);
+}
+
+static void
 xdg_app_run_add_x11_args (GPtrArray *argv_array)
 {
   char *x11_socket = NULL;
@@ -1397,9 +1409,12 @@ xdg_app_run_add_extension_args (GPtrArray   *argv_array,
         {
           g_autoptr(GFile) files = g_file_get_child (deploy, "files");
           g_autofree char *full_directory = g_build_filename (is_app ? "/app" : "/usr", ext->directory, NULL);
+          g_autofree char *ref = g_build_filename (full_directory, ".ref", NULL);
 
-          g_ptr_array_add (argv_array, g_strdup ("-b"));
-          g_ptr_array_add (argv_array, g_strdup_printf ("%s=%s", full_directory, gs_file_get_path_cached (files)));
+          add_args (argv_array,
+                    "--bind", gs_file_get_path_cached (files), full_directory,
+                    "--lock-file", ref,
+                    NULL);
         }
     }
 
@@ -1998,6 +2013,8 @@ add_app_info_args (GPtrArray *argv_array,
       g_autoptr(GKeyFile) keyfile = NULL;
       g_autoptr(GFile) files = NULL;
       g_autofree char *files_path = NULL;
+      g_autofree char *fd_str = NULL;
+      g_autofree char *dest = g_strdup_printf ("/run/user/%d/xdg-app-info", getuid ());
 
       close (fd);
 
@@ -2016,32 +2033,19 @@ add_app_info_args (GPtrArray *argv_array,
       if (!g_key_file_save_to_file (keyfile, tmp_path, error))
         return FALSE;
 
-      g_ptr_array_add (argv_array, g_strdup ("-M"));
-      g_ptr_array_add (argv_array, g_strdup_printf ("/run/user/%d/xdg-app-info=%s", getuid(), tmp_path));
+      fd = open (tmp_path, O_RDONLY);
+      if (fd == -1)
+        {
+          g_set_error (error, G_IO_ERROR, g_io_error_from_errno (errno), "Failed to open temp file");
+          return FALSE;
+        }
+      unlink (tmp_path);
+      fd_str = g_strdup_printf ("%d", fd);
+
+      add_args (argv_array, "--file", fd_str, dest, NULL);
     }
 
   return TRUE;
-}
-
-static void
-add_app_id_dir_links_args (GPtrArray *argv_array,
-                           GFile *app_id_dir)
-{
-  g_autoptr(GFile) app_cache_dir = NULL;
-  g_autoptr(GFile) app_data_dir = NULL;
-  g_autoptr(GFile) app_config_dir = NULL;
-
-  app_cache_dir = g_file_get_child (app_id_dir, "cache");
-  g_ptr_array_add (argv_array, g_strdup ("-B"));
-  g_ptr_array_add (argv_array, g_strdup_printf ("/var/cache=%s", gs_file_get_path_cached (app_cache_dir)));
-
-  app_data_dir = g_file_get_child (app_id_dir, "data");
-  g_ptr_array_add (argv_array, g_strdup ("-B"));
-  g_ptr_array_add (argv_array, g_strdup_printf ("/var/data=%s", gs_file_get_path_cached (app_data_dir)));
-
-  app_config_dir = g_file_get_child (app_id_dir, "config");
-  g_ptr_array_add (argv_array, g_strdup ("-B"));
-  g_ptr_array_add (argv_array, g_strdup_printf ("/var/config=%s", gs_file_get_path_cached (app_config_dir)));
 }
 
 static void
@@ -2134,8 +2138,10 @@ add_dbus_proxy_args (GPtrArray *argv_array,
       return FALSE;
     }
 
+#ifdef BUBBLE
   g_ptr_array_insert (dbus_proxy_argv, 0, g_strdup (DBUSPROXY));
   g_ptr_array_insert (dbus_proxy_argv, 1, g_strdup_printf ("--fd=%d", sync_proxy_pipes[1]));
+#endif
 
   g_ptr_array_add (dbus_proxy_argv, NULL); /* NULL terminate */
 
@@ -2167,6 +2173,57 @@ add_dbus_proxy_args (GPtrArray *argv_array,
   g_ptr_array_add (argv_array, g_strdup_printf ("%d", sync_proxy_pipes[0]));
 
   return TRUE;
+}
+
+static void
+setup_base_argv (GPtrArray *argv_array,
+                 GFile *runtime_files,
+                 GFile *app_files,
+                 GFile *app_id_dir)
+{
+  const char *usr_links[] = {"lib", "lib32", "lib64", "bin", "sbin", "etc"};
+  g_autofree char *run_dir = g_strdup_printf ("/run/user/%d", getuid ());
+  g_autoptr(GFile) app_cache_dir = g_file_get_child (app_id_dir, "cache");
+  g_autoptr(GFile) app_data_dir = g_file_get_child (app_id_dir, "data");
+  g_autoptr(GFile) app_config_dir = g_file_get_child (app_id_dir, "config");
+  int i;
+
+  add_args (argv_array,
+            "--ro-bind", gs_file_get_path_cached (runtime_files), "/usr",
+            "--lock-file", "/usr/.ref",
+            "--ro-bind", gs_file_get_path_cached (app_files), "/app",
+            "--lock-file", "/app/.ref",
+            "--dev", "/dev",
+            "--proc", "/proc",
+            "--dir", "/tmp",
+            "--dir", "/run/host",
+            "--dir", run_dir,
+            "--symlink", "/tmp", "/var/tmp",
+            "--symlink", "/run", "/var/run",
+            "--ro-bind", "/sys/block", "/sys/block",
+            "--ro-bind", "/sys/bus", "/sys/bus",
+            "--ro-bind", "/sys/class", "/sys/class",
+            "--ro-bind", "/sys/dev", "/sys/dev",
+            "--ro-bind", "/sys/devices", "/sys/devices",
+            /* These are nice to have as a fixed path */
+            "--bind", gs_file_get_path_cached (app_cache_dir), "/var/cache",
+            "--bind", gs_file_get_path_cached (app_data_dir), "/var/data",
+            "--bind", gs_file_get_path_cached (app_config_dir), "/var/config",
+            NULL);
+
+  for (i = 0; i < G_N_ELEMENTS(usr_links); i++)
+    {
+      const char *subdir = usr_links[i];
+      g_autoptr(GFile) runtime_subdir = g_file_get_child (runtime_files, subdir);
+      if (g_file_query_exists (runtime_subdir, NULL))
+        {
+          g_autofree char *link = g_strconcat ("usr/", subdir, NULL);
+          g_autofree char *dest = g_strconcat ("/", subdir, NULL);
+          add_args (argv_array,
+                    "--symlink", link, dest,
+                    NULL);
+        }
+    }
 }
 
 gboolean
@@ -2212,12 +2269,6 @@ xdg_app_run_app (const char *app_ref,
   argv_array = g_ptr_array_new_with_free_func (g_free);
   session_bus_proxy_argv = g_ptr_array_new_with_free_func (g_free);
   system_bus_proxy_argv = g_ptr_array_new_with_free_func (g_free);
-  g_ptr_array_add (argv_array, g_strdup (HELPER));
-  g_ptr_array_add (argv_array, g_strdup ("-l"));
-
-  if (!xdg_app_run_add_extension_args (argv_array, metakey, app_ref, cancellable, error))
-    return FALSE;
-
 
   default_runtime = g_key_file_get_string (metakey, "Application",
                                            (flags & XDG_APP_RUN_FLAG_DEVEL) != 0 ? "sdk" : "runtime",
@@ -2276,17 +2327,26 @@ xdg_app_run_app (const char *app_ref,
   if (extra_context)
     xdg_app_context_merge (app_context, extra_context);
 
+  runtime_files = xdg_app_deploy_get_files (runtime_deploy);
+  app_files = xdg_app_deploy_get_files (app_deploy);
+
+  if ((app_id_dir = xdg_app_ensure_data_dir (app_ref_parts[1], cancellable, error)) == NULL)
+      return FALSE;
+
+  g_ptr_array_add (argv_array, g_strdup (HELPER));
+
+  setup_base_argv (argv_array, runtime_files, app_files, app_id_dir);
+
   if (!add_app_info_args (argv_array, app_deploy, app_ref_parts[1], runtime_ref, app_context, error))
+    return FALSE;
+
+  if (!xdg_app_run_add_extension_args (argv_array, metakey, app_ref, cancellable, error))
     return FALSE;
 
   if (!xdg_app_run_add_extension_args (argv_array, runtime_metakey, runtime_ref, cancellable, error))
     return FALSE;
 
-  if ((app_id_dir = xdg_app_ensure_data_dir (app_ref_parts[1], cancellable, error)) == NULL)
-      return FALSE;
-
-  add_app_id_dir_links_args (argv_array, app_id_dir);
-
+#ifdef BUBBLE
   add_monitor_path_args (argv_array);
 
   add_document_portal_args (argv_array, app_ref_parts[1]);
@@ -2301,6 +2361,9 @@ xdg_app_run_app (const char *app_ref,
 
   add_font_path_args (argv_array);
 
+#endif
+
+
   /* Must run this before spawning the dbus proxy, to ensure it
      ends up in the app cgroup */
   if (!xdg_app_run_in_transient_unit (app_ref_parts[1], error))
@@ -2312,14 +2375,21 @@ xdg_app_run_app (const char *app_ref,
   if (!add_dbus_proxy_args (argv_array, system_bus_proxy_argv, error))
     return FALSE;
 
-  app_files = xdg_app_deploy_get_files (app_deploy);
+#ifdef BUBBLE
   g_ptr_array_add (argv_array, g_strdup ("-a"));
   g_ptr_array_add (argv_array, g_file_get_path (app_files));
+#endif
 
-  runtime_files = xdg_app_deploy_get_files (runtime_deploy);
+#ifdef BUBBLE
   g_ptr_array_add (argv_array, g_strdup ("-I"));
   g_ptr_array_add (argv_array, g_strdup (app_ref_parts[1]));
   g_ptr_array_add (argv_array, g_file_get_path (runtime_files));
+#endif
+
+  /* Do this after setting up everything in the home dir */
+  add_args (argv_array,
+            "--bind", gs_file_get_path_cached (app_id_dir), gs_file_get_path_cached (app_id_dir),
+            NULL);
 
   if (custom_command)
     command = custom_command;
@@ -2340,6 +2410,11 @@ xdg_app_run_app (const char *app_ref,
     g_ptr_array_add (argv_array, g_strdup (args[i]));
 
   g_ptr_array_add (argv_array, NULL);
+
+  {
+    g_autofree char *commandline = g_strjoinv (" ", (char **) argv_array->pdata);
+    g_print ("execing %s\n", commandline);
+  }
 
   envp = g_get_environ ();
   envp = xdg_app_run_apply_env_default (envp);
