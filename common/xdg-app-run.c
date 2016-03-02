@@ -2066,7 +2066,8 @@ add_app_info_args (GPtrArray *argv_array,
 }
 
 static void
-add_monitor_path_args (GPtrArray *argv_array)
+add_monitor_path_args (GPtrArray *argv_array,
+                       char ***envp_p)
 {
   g_autoptr(XdgAppSessionHelper) session_helper = NULL;
   g_autofree char *monitor_path = NULL;
@@ -2082,11 +2083,20 @@ add_monitor_path_args (GPtrArray *argv_array)
                                                         &monitor_path,
                                                         NULL, NULL))
     {
-      g_ptr_array_add (argv_array, g_strdup ("-m"));
-      g_ptr_array_add (argv_array, g_strdup (monitor_path));
+      add_args (argv_array,
+                "--bind", monitor_path, "/run/host/monitor",
+                NULL);
+      *envp_p = g_environ_setenv (*envp_p, "TZ", ":/run/host/monitor/localtime", TRUE);
+#ifdef BUBBLE
+      /* Handle resolv.conf symlink. How to do this? the monitor file is atomically replaces, so we can't bind mount to it */
+#endif
     }
   else
-    g_ptr_array_add (argv_array, g_strdup ("-r"));
+    {
+      add_args (argv_array,
+                "--bind", "/etc/resolv.conf", "/usr/etc/resolv.conf",
+                NULL);
+    }
 }
 
 static void
@@ -2460,11 +2470,12 @@ xdg_app_run_app (const char *app_ref,
   if (!xdg_app_run_add_extension_args (argv_array, runtime_metakey, runtime_ref, cancellable, error))
     return FALSE;
 
-#ifdef BUBBLE
-  add_monitor_path_args (argv_array);
-  add_document_portal_args (argv_array, app_ref_parts[1]);
+  add_monitor_path_args (argv_array, &envp);
 
+#ifdef BUBBLE
+  add_document_portal_args (argv_array, app_ref_parts[1]);
 #endif
+
   xdg_app_run_add_environment_args (argv_array, &envp,
                                     session_bus_proxy_argv,
                                     system_bus_proxy_argv,
