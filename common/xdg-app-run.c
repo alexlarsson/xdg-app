@@ -2097,14 +2097,11 @@ add_monitor_path_args (GPtrArray *argv_array,
                 "--bind", monitor_path, "/run/host/monitor",
                 NULL);
       *envp_p = g_environ_setenv (*envp_p, "TZ", ":/run/host/monitor/localtime", TRUE);
-#ifdef BUBBLE
-      /* Handle resolv.conf symlink. How to do this? the monitor file is atomically replaces, so we can't bind mount to it */
-#endif
     }
   else
     {
       add_args (argv_array,
-                "--bind", "/etc/resolv.conf", "/usr/etc/resolv.conf",
+                "--bind", "/etc/resolv.conf", "/run/host/monitor/resolv.conf",
                 NULL);
     }
 }
