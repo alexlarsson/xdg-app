@@ -1658,8 +1658,7 @@ xdg_app_run_add_environment_args (GPtrArray *argv_array,
 
 static const struct {const char *env; const char *val;} default_exports[] = {
   {"PATH","/app/bin:/usr/bin"},
-  {"LD_LIBRARY_PATH", ""},
-  {"_LD_LIBRARY_PATH", "/app/lib"},
+  {"LD_LIBRARY_PATH", "/app/lib"},
   {"XDG_CONFIG_DIRS","/app/etc/xdg:/etc/xdg"},
   {"XDG_DATA_DIRS","/app/share:/usr/share"},
   {"SHELL","/bin/sh"},
@@ -1784,11 +1783,6 @@ xdg_app_run_apply_env_vars (char **envp, XdgAppContext *context)
     {
       const char *var = key;
       const char *val = value;
-
-      /* We special case LD_LIBRARY_PATH to avoid passing it top
-         the helper */
-      if (strcmp (var, "LD_LIBRARY_PATH") == 0)
-        var = "_LD_LIBRARY_PATH";
 
       if (val && val[0] != 0)
         envp = g_environ_setenv (envp, var, val, TRUE);
@@ -2209,6 +2203,7 @@ setup_base_argv (GPtrArray *argv_array,
             "--bind", gs_file_get_path_cached (app_cache_dir), "/var/cache",
             "--bind", gs_file_get_path_cached (app_data_dir), "/var/data",
             "--bind", gs_file_get_path_cached (app_config_dir), "/var/config",
+            "--bind", "/etc/machine-id", "/usr/etc/machine-id",
             NULL);
 
   for (i = 0; i < G_N_ELEMENTS(usr_links); i++)
@@ -2405,6 +2400,19 @@ xdg_app_run_app (const char *app_ref,
       command = default_command;
     }
 
+  envp = g_get_environ ();
+  envp = xdg_app_run_apply_env_default (envp);
+  envp = xdg_app_run_apply_env_vars (envp, app_context);
+  envp = xdg_app_run_apply_env_appid (envp, app_id_dir);
+  if (g_environ_getenv (envp, "LD_LIBRARY_PATH") != NULL)
+    {
+      /* LD_LIBRARY_PATH is overridden for setuid helper, so pass it as cmdline arg */
+      add_args (argv_array,
+                "--setenv", "LD_LIBRARY_PATH", g_environ_getenv (envp, "LD_LIBRARY_PATH"),
+                NULL);
+      envp = g_environ_unsetenv (envp, "LD_LIBRARY_PATH");
+    }
+
   g_ptr_array_add (argv_array, g_strdup (command));
   for (i = 0; i < n_args; i++)
     g_ptr_array_add (argv_array, g_strdup (args[i]));
@@ -2415,13 +2423,6 @@ xdg_app_run_app (const char *app_ref,
     g_autofree char *commandline = g_strjoinv (" ", (char **) argv_array->pdata);
     g_print ("execing %s\n", commandline);
   }
-
-  envp = g_get_environ ();
-  envp = xdg_app_run_apply_env_default (envp);
-
-  envp = xdg_app_run_apply_env_vars (envp, app_context);
-
-  envp = xdg_app_run_apply_env_appid (envp, app_id_dir);
 
   if ((flags & XDG_APP_RUN_FLAG_BACKGROUND) != 0)
     {
