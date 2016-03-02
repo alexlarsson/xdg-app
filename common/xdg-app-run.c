@@ -2130,12 +2130,15 @@ add_document_portal_args (GPtrArray *argv_array,
             g_warning ("Can't get document portal: %s\n", local_error->message);
           else
             {
+              g_autofree char *src_path = NULL;
+              g_autofree char *dst_path = NULL;
               g_variant_get (g_dbus_message_get_body (reply),
                              "(^ay)", &doc_mount_path);
 
-              g_ptr_array_add (argv_array, g_strdup ("-b"));
-              g_ptr_array_add (argv_array, g_strdup_printf ("/run/user/%d/doc=%s/by-app/%s",
-                                                            getuid(), doc_mount_path, app_id));
+              src_path = g_strdup_printf ("%s/by-app/%s",
+                                          doc_mount_path, app_id);
+              dst_path = g_strdup_printf ("/run/user/%d/doc", getuid());
+              add_args (argv_array, "--bind", src_path, dst_path, NULL);
             }
         }
     }
@@ -2472,9 +2475,7 @@ xdg_app_run_app (const char *app_ref,
 
   add_monitor_path_args (argv_array, &envp);
 
-#ifdef BUBBLE
   add_document_portal_args (argv_array, app_ref_parts[1]);
-#endif
 
   xdg_app_run_add_environment_args (argv_array, &envp,
                                     session_bus_proxy_argv,
