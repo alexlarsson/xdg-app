@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/utsname.h>
+#include <grp.h>
 
 #ifdef ENABLE_XAUTH
 #include <X11/Xauth.h>
@@ -39,6 +40,7 @@
 #include "xdg-app-utils.h"
 #include "xdg-app-systemd-dbus.h"
 
+#define DEFAULT_SHELL "/bin/sh"
 
 typedef enum {
   XDG_APP_CONTEXT_SHARED_NETWORK   = 1 << 0,
@@ -2191,11 +2193,65 @@ add_dbus_proxy_args (GPtrArray *argv_array,
   return TRUE;
 }
 
-static void
+static int
+create_tmp_fd (const char *contents,
+               gssize length,
+               GError **error)
+{
+  char template[] = "/tmp/tmp_fd_XXXXXX";
+  int fd;
+
+  if (length < 0)
+    length = strlen (contents);
+
+  fd = g_mkstemp (template);
+  if (fd < 0)
+    {
+      g_set_error (error, G_IO_ERROR, g_io_error_from_errno (errno), "Failed to create temporary file");
+      return -1;
+    }
+
+  if (unlink (template) != 0)
+    {
+      g_set_error (error, G_IO_ERROR, g_io_error_from_errno (errno), "Failed to unlink temporary file");
+      close (fd);
+      return -1;
+    }
+
+  while (length > 0)
+    {
+      gssize s;
+
+      s = write (fd, contents, length);
+
+      if (s < 0)
+        {
+          int saved_errno = errno;
+          if (saved_errno == EINTR)
+            continue;
+
+          g_set_error (error, G_IO_ERROR, g_io_error_from_errno (saved_errno), "Failed to write to temporary file");
+          close (fd);
+          return -1;
+        }
+
+      g_assert (s <= length);
+
+      contents += s;
+      length -= s;
+    }
+
+  lseek (fd, 0, SEEK_SET);
+
+  return fd;
+}
+
+static gboolean
 setup_base_argv (GPtrArray *argv_array,
                  GFile *runtime_files,
                  GFile *app_files,
-                 GFile *app_id_dir)
+                 GFile *app_id_dir,
+                 GError **error)
 {
   const char *usr_links[] = {"lib", "lib32", "lib64", "bin", "sbin", "etc"};
   g_autofree char *run_dir = g_strdup_printf ("/run/user/%d", getuid ());
@@ -2203,6 +2259,33 @@ setup_base_argv (GPtrArray *argv_array,
   g_autoptr(GFile) app_data_dir = g_file_get_child (app_id_dir, "data");
   g_autoptr(GFile) app_config_dir = g_file_get_child (app_id_dir, "config");
   int i;
+  int passwd_fd = -1;
+  g_autofree char *passwd_fd_str = NULL;
+  g_autofree char *passwd_contents = NULL;
+  int group_fd = -1;
+  g_autofree char *group_fd_str = NULL;
+  g_autofree char *group_contents = NULL;
+  struct group *g = getgrgid (getgid ());
+
+  passwd_contents = g_strdup_printf ("%s:x:%d:%d:%s:%s:%s\n"
+                                     "nfsnobody:x:65534:65534:Unmapped user:/:/sbin/nologin\n",
+                                     g_get_user_name (),
+                                     getuid (), getgid (),
+                                     g_get_real_name (),
+                                     g_get_home_dir (),
+                                     DEFAULT_SHELL);
+
+  if ((passwd_fd = create_tmp_fd (passwd_contents, -1, error)) < 0)
+    return FALSE;
+  passwd_fd_str = g_strdup_printf ("%d", passwd_fd);
+
+  group_contents = g_strdup_printf ("%s:x:%d:%s\n"
+                                   "nfsnobody:x:65534:\n",
+                                   g->gr_name,
+                                   getgid (), g_get_user_name ());
+  if ((group_fd = create_tmp_fd (group_contents, -1, error)) < 0)
+    return FALSE;
+  group_fd_str = g_strdup_printf ("%d", group_fd);
 
   add_args (argv_array,
             "--unshare-pid",
@@ -2228,6 +2311,8 @@ setup_base_argv (GPtrArray *argv_array,
             "--bind", gs_file_get_path_cached (app_data_dir), "/var/data",
             "--bind", gs_file_get_path_cached (app_config_dir), "/var/config",
             "--bind", "/etc/machine-id", "/usr/etc/machine-id",
+            "--bind-data", passwd_fd_str, "/usr/etc/passwd",
+            "--bind-data", group_fd_str, "/usr/etc/group",
             NULL);
 
   for (i = 0; i < G_N_ELEMENTS(usr_links); i++)
@@ -2243,6 +2328,8 @@ setup_base_argv (GPtrArray *argv_array,
                     NULL);
         }
     }
+
+  return TRUE;
 }
 
 gboolean
@@ -2360,7 +2447,8 @@ xdg_app_run_app (const char *app_ref,
 
   g_ptr_array_add (argv_array, g_strdup (HELPER));
 
-  setup_base_argv (argv_array, runtime_files, app_files, app_id_dir);
+  if (!setup_base_argv (argv_array, runtime_files, app_files, app_id_dir, error))
+    return FALSE;
 
   if (!add_app_info_args (argv_array, app_deploy, app_ref_parts[1], runtime_ref, app_context, error))
     return FALSE;
