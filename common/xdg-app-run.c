@@ -1460,13 +1460,11 @@ xdg_app_run_add_environment_args (GPtrArray *argv_array,
       add_args (argv_array, "--unshare-ipc", NULL);
     }
 
-#ifdef BUBBLE
   if ((context->shares & XDG_APP_CONTEXT_SHARED_NETWORK) == 0)
     {
       g_debug ("Disallowing network access");
       add_args (argv_array, "--unshare-net", NULL);
     }
-#endif
 
   if (context->devices & XDG_APP_CONTEXT_DEVICE_DRI)
     {
