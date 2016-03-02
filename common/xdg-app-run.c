@@ -2183,6 +2183,7 @@ setup_base_argv (GPtrArray *argv_array,
   int i;
 
   add_args (argv_array,
+            "--unshare-pid",
             "--ro-bind", gs_file_get_path_cached (runtime_files), "/usr",
             "--lock-file", "/usr/.ref",
             "--ro-bind", gs_file_get_path_cached (app_files), "/app",
