@@ -1185,6 +1185,59 @@ add_args (GPtrArray *argv_array, ...)
   va_end (args);
 }
 
+static int
+create_tmp_fd (const char *contents,
+               gssize length,
+               GError **error)
+{
+  char template[] = "/tmp/tmp_fd_XXXXXX";
+  int fd;
+
+  if (length < 0)
+    length = strlen (contents);
+
+  fd = g_mkstemp (template);
+  if (fd < 0)
+    {
+      g_set_error (error, G_IO_ERROR, g_io_error_from_errno (errno), "Failed to create temporary file");
+      return -1;
+    }
+
+  if (unlink (template) != 0)
+    {
+      g_set_error (error, G_IO_ERROR, g_io_error_from_errno (errno), "Failed to unlink temporary file");
+      close (fd);
+      return -1;
+    }
+
+  while (length > 0)
+    {
+      gssize s;
+
+      s = write (fd, contents, length);
+
+      if (s < 0)
+        {
+          int saved_errno = errno;
+          if (saved_errno == EINTR)
+            continue;
+
+          g_set_error (error, G_IO_ERROR, g_io_error_from_errno (saved_errno), "Failed to write to temporary file");
+          close (fd);
+          return -1;
+        }
+
+      g_assert (s <= length);
+
+      contents += s;
+      length -= s;
+    }
+
+  lseek (fd, 0, SEEK_SET);
+
+  return fd;
+}
+
 static void
 xdg_app_run_add_x11_args (GPtrArray *argv_array,
                           char ***envp_p)
@@ -1241,29 +1294,56 @@ xdg_app_run_add_x11_args (GPtrArray *argv_array,
         }
 #endif
     }
+  else
+    *envp_p = g_environ_unsetenv (*envp_p, "DISPLAY");
+
 }
 
 static void
-xdg_app_run_add_wayland_args (GPtrArray *argv_array)
+xdg_app_run_add_wayland_args (GPtrArray *argv_array,
+                              char ***envp_p)
 {
-  char *wayland_socket = g_build_filename (g_get_user_runtime_dir (), "wayland-0", NULL);
+  g_autofree char *wayland_socket = g_build_filename (g_get_user_runtime_dir (), "wayland-0", NULL);
+  g_autofree char *sandbox_wayland_socket = g_strdup_printf ("/run/user/%d/wayland-0", getuid ());
+
   if (g_file_test (wayland_socket, G_FILE_TEST_EXISTS))
     {
-      g_ptr_array_add (argv_array, g_strdup ("-y"));
-      g_ptr_array_add (argv_array, wayland_socket);
+      add_args (argv_array,
+                "--bind", wayland_socket, sandbox_wayland_socket,
+                NULL);
     }
-  else
-    g_free (wayland_socket);
 }
 
 static void
-xdg_app_run_add_pulseaudio_args (GPtrArray *argv_array)
+xdg_app_run_add_pulseaudio_args (GPtrArray *argv_array,
+                                 char ***envp_p)
 {
   char *pulseaudio_socket = g_build_filename (g_get_user_runtime_dir (), "pulse/native", NULL);
+
+  *envp_p = g_environ_unsetenv (*envp_p, "PULSE_SERVER");
   if (g_file_test (pulseaudio_socket, G_FILE_TEST_EXISTS))
     {
-      g_ptr_array_add (argv_array, g_strdup ("-p"));
-      g_ptr_array_add (argv_array, pulseaudio_socket);
+      gboolean share_shm = FALSE; /* TODO: When do we add this? */
+      g_autofree char *client_config = g_strdup_printf ("enable-shm=%s\n", share_shm ? "yes" : "no");
+      g_autofree char *sandbox_socket_path = g_strdup_printf ("/run/user/%d/pulse/native", getuid ());
+      g_autofree char *pulse_server = g_strdup_printf ("unix:/run/user/%d/pulse/native", getuid ());
+      g_autofree char *config_path = g_strdup_printf ("/run/user/%d/pulse/config", getuid ());
+      int fd;
+      g_autofree char *fd_str = NULL;
+
+      fd = create_tmp_fd (client_config, -1, NULL);
+      if (fd == -1)
+        return;
+
+      fd_str = g_strdup_printf ("%d", fd);
+
+      add_args (argv_array,
+                "--bind", pulseaudio_socket, sandbox_socket_path,
+                "--bind-data", fd_str, config_path,
+                NULL);
+
+      *envp_p = g_environ_setenv (*envp_p, "PULSE_SERVER", pulse_server, TRUE);
+      *envp_p = g_environ_setenv (*envp_p, "PULSE_CLIENTCONFIG", config_path, TRUE);
     }
 }
 
@@ -1653,19 +1733,17 @@ xdg_app_run_add_environment_args (GPtrArray *argv_array,
       xdg_app_run_add_x11_args (argv_array, envp_p);
     }
 
-#ifdef BUBBLE
   if (context->sockets & XDG_APP_CONTEXT_SOCKET_WAYLAND)
     {
       g_debug ("Allowing wayland access");
-      xdg_app_run_add_wayland_args (argv_array);
+      xdg_app_run_add_wayland_args (argv_array, envp_p);
     }
 
   if (context->sockets & XDG_APP_CONTEXT_SOCKET_PULSEAUDIO)
     {
       g_debug ("Allowing pulseaudio access");
-      xdg_app_run_add_pulseaudio_args (argv_array);
+      xdg_app_run_add_pulseaudio_args (argv_array, envp_p);
     }
-#endif
 
   unrestricted_session_bus = (context->sockets & XDG_APP_CONTEXT_SOCKET_SESSION_BUS) != 0;
   if (unrestricted_session_bus)
@@ -2213,60 +2291,6 @@ add_dbus_proxy_args (GPtrArray *argv_array,
 
   return TRUE;
 }
-
-static int
-create_tmp_fd (const char *contents,
-               gssize length,
-               GError **error)
-{
-  char template[] = "/tmp/tmp_fd_XXXXXX";
-  int fd;
-
-  if (length < 0)
-    length = strlen (contents);
-
-  fd = g_mkstemp (template);
-  if (fd < 0)
-    {
-      g_set_error (error, G_IO_ERROR, g_io_error_from_errno (errno), "Failed to create temporary file");
-      return -1;
-    }
-
-  if (unlink (template) != 0)
-    {
-      g_set_error (error, G_IO_ERROR, g_io_error_from_errno (errno), "Failed to unlink temporary file");
-      close (fd);
-      return -1;
-    }
-
-  while (length > 0)
-    {
-      gssize s;
-
-      s = write (fd, contents, length);
-
-      if (s < 0)
-        {
-          int saved_errno = errno;
-          if (saved_errno == EINTR)
-            continue;
-
-          g_set_error (error, G_IO_ERROR, g_io_error_from_errno (saved_errno), "Failed to write to temporary file");
-          close (fd);
-          return -1;
-        }
-
-      g_assert (s <= length);
-
-      contents += s;
-      length -= s;
-    }
-
-  lseek (fd, 0, SEEK_SET);
-
-  return fd;
-}
-
 static gboolean
 setup_base_argv (GPtrArray *argv_array,
                  GFile *runtime_files,
@@ -2505,9 +2529,12 @@ xdg_app_run_app (const char *app_ref,
   if (sync_fds[1] != -1)
     close (sync_fds[1]);
 
-  /* Do this after setting up everything in the home dir */
   add_args (argv_array,
+            /* Do this after setting up everything in the home dir, so its not overwritten */
             "--bind", gs_file_get_path_cached (app_id_dir), gs_file_get_path_cached (app_id_dir),
+            /* Not in base, because we don't want this for xdg-app build */
+            "--symlink", "/app/lib/debug/source", "/run/build",
+            "--symlink", "/usr/lib/debug/source", "/run/build-runtime",
             NULL);
 
   if (g_environ_getenv (envp, "LD_LIBRARY_PATH") != NULL)
