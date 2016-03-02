@@ -64,6 +64,7 @@ gboolean  xdg_app_run_add_extension_args     (GPtrArray   *argv_array,
                                               GCancellable *cancellable,
                                               GError     **error);
 void     xdg_app_run_add_environment_args    (GPtrArray   *argv_array,
+                                              char      ***envp_p,
 					      GPtrArray   *session_bus_proxy_argv,
 					      GPtrArray   *system_bus_proxy_argv,
                                               const char  *app_id,

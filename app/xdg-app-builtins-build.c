@@ -156,7 +156,9 @@ xdg_app_builtin_build (int argc, char **argv, GCancellable *cancellable, GError 
   xdg_app_context_allow_host_fs (app_context);
   xdg_app_context_merge (app_context, arg_context);
 
-  xdg_app_run_add_environment_args (argv_array, NULL, NULL, app_id,
+  envp = xdg_app_run_get_minimal_env (TRUE);
+  envp = xdg_app_run_apply_env_vars (envp, app_context);
+  xdg_app_run_add_environment_args (argv_array, &envp, NULL, NULL, app_id,
                                     app_context, NULL);
 
   if (!custom_usr &&
@@ -192,9 +194,6 @@ xdg_app_builtin_build (int argc, char **argv, GCancellable *cancellable, GError 
     g_ptr_array_add (argv_array, g_strdup (argv[rest_argv_start + i]));
 
   g_ptr_array_add (argv_array, NULL);
-
-  envp = xdg_app_run_get_minimal_env (TRUE);
-  envp = xdg_app_run_apply_env_vars (envp, app_context);
 
   if (!execve (HELPER, (char **)argv_array->pdata, envp))
     {

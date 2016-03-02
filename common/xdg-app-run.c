@@ -1271,8 +1271,9 @@ create_proxy_socket (char *template)
 
 gboolean
 xdg_app_run_add_system_dbus_args (XdgAppContext *context,
+                                  char ***envp_p,
                                   GPtrArray *argv_array,
-				  GPtrArray *dbus_proxy_argv,
+                                  GPtrArray *dbus_proxy_argv,
                                   gboolean unrestricted)
 {
   const char *dbus_address = g_getenv ("DBUS_SYSTEM_BUS_ADDRESS");
@@ -1286,8 +1287,10 @@ xdg_app_run_add_system_dbus_args (XdgAppContext *context,
 
   if (dbus_system_socket != NULL && unrestricted)
     {
-      g_ptr_array_add (argv_array, g_strdup ("-D"));
-      g_ptr_array_add (argv_array, dbus_system_socket);
+      add_args (argv_array,
+                "--bind", dbus_system_socket, "/run/dbus/system_bus_socket",
+                NULL);
+      *envp_p = g_environ_setenv (*envp_p, "DBUS_SYSTEM_BUS_ADDRESS", "unix:path=/run/dbus/system_bus_socket", TRUE);
 
       return TRUE;
     }
@@ -1297,7 +1300,7 @@ xdg_app_run_add_system_dbus_args (XdgAppContext *context,
       g_autofree char *proxy_socket = create_proxy_socket ("system-bus-proxy-XXXXXX");
 
       if (proxy_socket == NULL)
-	return FALSE;
+        return FALSE;
 
       if (dbus_address)
         real_dbus_address = g_strdup (dbus_address);
@@ -1307,8 +1310,11 @@ xdg_app_run_add_system_dbus_args (XdgAppContext *context,
       g_ptr_array_add (dbus_proxy_argv, g_strdup (real_dbus_address));
       g_ptr_array_add (dbus_proxy_argv, g_strdup (proxy_socket));
 
-      g_ptr_array_add (argv_array, g_strdup ("-D"));
-      g_ptr_array_add (argv_array, g_strdup (proxy_socket));
+
+      add_args (argv_array,
+                "--bind", proxy_socket, "/run/dbus/system_bus_socket",
+                NULL);
+      *envp_p = g_environ_setenv (*envp_p, "DBUS_SYSTEM_BUS_ADDRESS", "unix:path=/run/dbus/system_bus_socket", TRUE);
 
       return TRUE;
     }
@@ -1317,11 +1323,14 @@ xdg_app_run_add_system_dbus_args (XdgAppContext *context,
 
 gboolean
 xdg_app_run_add_session_dbus_args (GPtrArray *argv_array,
+                                   char ***envp_p,
                                    GPtrArray *dbus_proxy_argv,
                                    gboolean unrestricted)
 {
   const char *dbus_address = g_getenv ("DBUS_SESSION_BUS_ADDRESS");
   char *dbus_session_socket = NULL;
+  g_autofree char *sandbox_socket_path = g_strdup_printf ("/run/user/%d/bus", getuid ());
+  g_autofree char *sandbox_dbus_address = g_strdup_printf ("unix:path=/run/user/%d/bus", getuid ());
 
   if (dbus_address == NULL)
     return FALSE;
@@ -1329,8 +1338,11 @@ xdg_app_run_add_session_dbus_args (GPtrArray *argv_array,
   dbus_session_socket = extract_unix_path_from_dbus_address (dbus_address);
   if (dbus_session_socket != NULL && unrestricted)
     {
-      g_ptr_array_add (argv_array, g_strdup ("-d"));
-      g_ptr_array_add (argv_array, dbus_session_socket);
+
+      add_args (argv_array,
+                "--bind", dbus_session_socket, sandbox_socket_path,
+                NULL);
+      *envp_p = g_environ_setenv (*envp_p, "DBUS_SESSION_BUS_ADDRESS", sandbox_dbus_address, TRUE);
 
       return TRUE;
     }
@@ -1339,13 +1351,15 @@ xdg_app_run_add_session_dbus_args (GPtrArray *argv_array,
       g_autofree char *proxy_socket = create_proxy_socket ("session-bus-proxy-XXXXXX");
 
       if (proxy_socket == NULL)
-	return FALSE;
+        return FALSE;
 
       g_ptr_array_add (dbus_proxy_argv, g_strdup (dbus_address));
       g_ptr_array_add (dbus_proxy_argv, g_strdup (proxy_socket));
 
-      g_ptr_array_add (argv_array, g_strdup ("-d"));
-      g_ptr_array_add (argv_array, g_strdup (proxy_socket));
+      add_args (argv_array,
+                "--bind", proxy_socket, sandbox_socket_path,
+                NULL);
+      *envp_p = g_environ_setenv (*envp_p, "DBUS_SESSION_BUS_ADDRESS", sandbox_dbus_address, TRUE);
 
       return TRUE;
     }
@@ -1425,6 +1439,7 @@ xdg_app_run_add_extension_args (GPtrArray   *argv_array,
 
 void
 xdg_app_run_add_environment_args (GPtrArray *argv_array,
+                                  char ***envp_p,
 				  GPtrArray *session_bus_proxy_argv,
 				  GPtrArray *system_bus_proxy_argv,
                                   const char *app_id,
@@ -1437,31 +1452,35 @@ xdg_app_run_add_environment_args (GPtrArray *argv_array,
   gboolean unrestricted_system_bus;
   gboolean home_access = FALSE;
   GString *xdg_dirs_conf = NULL;
-  char opts[16];
   XdgAppFilesystemMode fs_mode, home_mode;
-  int i;
 
-  i = 0;
-  opts[i++] = '-';
-
-  if (context->shares & XDG_APP_CONTEXT_SHARED_IPC)
+  if ((context->shares & XDG_APP_CONTEXT_SHARED_IPC) == 0)
     {
-      g_debug ("Allowing ipc access");
-      opts[i++] = 'i';
+      g_debug ("Disallowing ipc access");
+      add_args (argv_array, "--unshare-ipc", NULL);
     }
 
-  if (context->shares & XDG_APP_CONTEXT_SHARED_NETWORK)
+#ifdef BUBBLE
+  if ((context->shares & XDG_APP_CONTEXT_SHARED_NETWORK) == 0)
     {
-      g_debug ("Allowing network access");
-      opts[i++] = 'n';
+      g_debug ("Disallowing network access");
+      add_args (argv_array, "--unshare-net", NULL);
     }
+#endif
 
   if (context->devices & XDG_APP_CONTEXT_DEVICE_DRI)
     {
       g_debug ("Allowing dri access");
-      opts[i++] = 'g';
+      if (g_file_test ("/dev/dri", G_FILE_TEST_IS_DIR))
+        add_args (argv_array, "--dev-bind", "/dev/dri", "/dev/dri", NULL);
+      if (g_file_test ("/dev/nvidiactl", G_FILE_TEST_EXISTS))
+        add_args (argv_array,
+                  "--dev-bind", "/dev/nvidiactl", "/dev/nvidiactl",
+                  "--dev-bind", "/dev/nvidia0", "/dev/nvidia0",
+                  NULL);
     }
 
+#ifdef BUBBLE
   fs_mode = (XdgAppFilesystemMode)g_hash_table_lookup (context->filesystems, "host");
   if (fs_mode != 0)
     {
@@ -1628,11 +1647,12 @@ xdg_app_run_add_environment_args (GPtrArray *argv_array,
       g_debug ("Allowing pulseaudio access");
       xdg_app_run_add_pulseaudio_args (argv_array);
     }
+#endif
 
   unrestricted_session_bus = (context->sockets & XDG_APP_CONTEXT_SOCKET_SESSION_BUS) != 0;
   if (unrestricted_session_bus)
     g_debug ("Allowing session-dbus access");
-  if (xdg_app_run_add_session_dbus_args (argv_array, session_bus_proxy_argv, unrestricted_session_bus) &&
+  if (xdg_app_run_add_session_dbus_args (argv_array, envp_p, session_bus_proxy_argv, unrestricted_session_bus) &&
       !unrestricted_session_bus && session_bus_proxy_argv)
     {
       xdg_app_add_bus_filters (session_bus_proxy_argv, context->session_bus_policy, app_id, context);
@@ -1641,19 +1661,21 @@ xdg_app_run_add_environment_args (GPtrArray *argv_array,
   unrestricted_system_bus = (context->sockets & XDG_APP_CONTEXT_SOCKET_SYSTEM_BUS) != 0;
   if (unrestricted_system_bus)
     g_debug ("Allowing system-dbus access");
-  if (xdg_app_run_add_system_dbus_args (context, argv_array, system_bus_proxy_argv,
+  if (xdg_app_run_add_system_dbus_args (context, envp_p, argv_array, system_bus_proxy_argv,
                                         unrestricted_system_bus) &&
       !unrestricted_system_bus && system_bus_proxy_argv)
     {
       xdg_app_add_bus_filters (system_bus_proxy_argv, context->system_bus_policy, NULL, context);
     }
 
+#ifdef BUBBLE
   g_assert (sizeof(opts) > i);
   if (i > 1)
     {
       opts[i++] = 0;
       g_ptr_array_add (argv_array, g_strdup (opts));
     }
+#endif
 }
 
 static const struct {const char *env; const char *val;} default_exports[] = {
@@ -2118,24 +2140,30 @@ dbus_spawn_child_setup (gpointer user_data)
 static gboolean
 add_dbus_proxy_args (GPtrArray *argv_array,
                      GPtrArray *dbus_proxy_argv,
+                     int sync_fds[2],
                      GError **error)
 {
-  int sync_proxy_pipes[2];
   char x = 'x';
 
   if (dbus_proxy_argv->len == 0)
     return TRUE;
 
-  if (pipe (sync_proxy_pipes) < 0)
+  if (sync_fds[0] == -1)
     {
-      g_set_error (error, G_IO_ERROR, g_io_error_from_errno (errno), "Unable to create sync pipe");
-      return FALSE;
+      g_autofree char *fd_str = NULL;
+
+      if (pipe (sync_fds) < 0)
+        {
+          g_set_error (error, G_IO_ERROR, g_io_error_from_errno (errno), "Unable to create sync pipe");
+          return FALSE;
+        }
+
+      fd_str = g_strdup_printf ("%d", sync_fds[0]);
+      add_args (argv_array, "--sync-fd", fd_str, NULL);
     }
 
-#ifdef BUBBLE
   g_ptr_array_insert (dbus_proxy_argv, 0, g_strdup (DBUSPROXY));
-  g_ptr_array_insert (dbus_proxy_argv, 1, g_strdup_printf ("--fd=%d", sync_proxy_pipes[1]));
-#endif
+  g_ptr_array_insert (dbus_proxy_argv, 1, g_strdup_printf ("--fd=%d", sync_fds[1]));
 
   g_ptr_array_add (dbus_proxy_argv, NULL); /* NULL terminate */
 
@@ -2144,27 +2172,23 @@ add_dbus_proxy_args (GPtrArray *argv_array,
                       NULL,
                       G_SPAWN_SEARCH_PATH,
                       dbus_spawn_child_setup,
-                      GINT_TO_POINTER (sync_proxy_pipes[1]),
+                      GINT_TO_POINTER (sync_fds[1]),
                       NULL, error))
     {
-      close (sync_proxy_pipes[0]);
-      close (sync_proxy_pipes[1]);
+      close (sync_fds[0]);
+      close (sync_fds[1]);
       return FALSE;
     }
 
-  close (sync_proxy_pipes[1]);
-
   /* Sync with proxy, i.e. wait until its listening on the sockets */
-  if (read (sync_proxy_pipes[0], &x, 1) != 1)
+  if (read (sync_fds[0], &x, 1) != 1)
     {
       g_set_error (error, G_IO_ERROR, g_io_error_from_errno (errno), "Failed to sync with dbus proxy");
 
-      close (sync_proxy_pipes[0]);
+      close (sync_fds[0]);
+      close (sync_fds[1]);
       return FALSE;
     }
-
-  g_ptr_array_add (argv_array, g_strdup ("-S"));
-  g_ptr_array_add (argv_array, g_strdup_printf ("%d", sync_proxy_pipes[0]));
 
   return TRUE;
 }
@@ -2243,6 +2267,7 @@ xdg_app_run_app (const char *app_ref,
   g_autofree char *default_runtime = NULL;
   g_autofree char *default_command = NULL;
   g_autofree char *runtime_ref = NULL;
+  int sync_fds[2] = {-1, -1};
   g_autoptr(GKeyFile) metakey = NULL;
   g_autoptr(GKeyFile) runtime_metakey = NULL;
   g_autoptr(GPtrArray) argv_array = NULL;
@@ -2330,6 +2355,11 @@ xdg_app_run_app (const char *app_ref,
   if ((app_id_dir = xdg_app_ensure_data_dir (app_ref_parts[1], cancellable, error)) == NULL)
       return FALSE;
 
+  envp = g_get_environ ();
+  envp = xdg_app_run_apply_env_default (envp);
+  envp = xdg_app_run_apply_env_vars (envp, app_context);
+  envp = xdg_app_run_apply_env_appid (envp, app_id_dir);
+
   g_ptr_array_add (argv_array, g_strdup (HELPER));
 
   setup_base_argv (argv_array, runtime_files, app_files, app_id_dir);
@@ -2345,14 +2375,15 @@ xdg_app_run_app (const char *app_ref,
 
 #ifdef BUBBLE
   add_monitor_path_args (argv_array);
-
   add_document_portal_args (argv_array, app_ref_parts[1]);
 
-  xdg_app_run_add_environment_args (argv_array,
+#endif
+  xdg_app_run_add_environment_args (argv_array, &envp,
                                     session_bus_proxy_argv,
                                     system_bus_proxy_argv,
                                     app_ref_parts[1], app_context, app_id_dir);
 
+#ifdef BUBBLE
   if ((flags & XDG_APP_RUN_FLAG_DEVEL) != 0)
     g_ptr_array_add (argv_array, g_strdup ("-c"));
 
@@ -2366,11 +2397,15 @@ xdg_app_run_app (const char *app_ref,
   if (!xdg_app_run_in_transient_unit (app_ref_parts[1], error))
     return FALSE;
 
-  if (!add_dbus_proxy_args (argv_array, session_bus_proxy_argv, error))
+  if (!add_dbus_proxy_args (argv_array, session_bus_proxy_argv, sync_fds, error))
     return FALSE;
 
-  if (!add_dbus_proxy_args (argv_array, system_bus_proxy_argv, error))
+  if (!add_dbus_proxy_args (argv_array, system_bus_proxy_argv, sync_fds, error))
     return FALSE;
+
+  if (sync_fds[1] != -1)
+    close (sync_fds[1]);
+
 
 #ifdef BUBBLE
   g_ptr_array_add (argv_array, g_strdup ("-a"));
@@ -2388,6 +2423,15 @@ xdg_app_run_app (const char *app_ref,
             "--bind", gs_file_get_path_cached (app_id_dir), gs_file_get_path_cached (app_id_dir),
             NULL);
 
+  if (g_environ_getenv (envp, "LD_LIBRARY_PATH") != NULL)
+    {
+      /* LD_LIBRARY_PATH is overridden for setuid helper, so pass it as cmdline arg */
+      add_args (argv_array,
+                "--setenv", "LD_LIBRARY_PATH", g_environ_getenv (envp, "LD_LIBRARY_PATH"),
+                NULL);
+      envp = g_environ_unsetenv (envp, "LD_LIBRARY_PATH");
+    }
+
   if (custom_command)
     command = custom_command;
   else
@@ -2400,19 +2444,6 @@ xdg_app_run_app (const char *app_ref,
         }
 
       command = default_command;
-    }
-
-  envp = g_get_environ ();
-  envp = xdg_app_run_apply_env_default (envp);
-  envp = xdg_app_run_apply_env_vars (envp, app_context);
-  envp = xdg_app_run_apply_env_appid (envp, app_id_dir);
-  if (g_environ_getenv (envp, "LD_LIBRARY_PATH") != NULL)
-    {
-      /* LD_LIBRARY_PATH is overridden for setuid helper, so pass it as cmdline arg */
-      add_args (argv_array,
-                "--setenv", "LD_LIBRARY_PATH", g_environ_getenv (envp, "LD_LIBRARY_PATH"),
-                NULL);
-      envp = g_environ_unsetenv (envp, "LD_LIBRARY_PATH");
     }
 
   g_ptr_array_add (argv_array, g_strdup (command));
