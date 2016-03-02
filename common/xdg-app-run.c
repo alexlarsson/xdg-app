@@ -1668,14 +1668,6 @@ xdg_app_run_add_environment_args (GPtrArray *argv_array,
       xdg_app_add_bus_filters (system_bus_proxy_argv, context->system_bus_policy, NULL, context);
     }
 
-#ifdef BUBBLE
-  g_assert (sizeof(opts) > i);
-  if (i > 1)
-    {
-      opts[i++] = 0;
-      g_ptr_array_add (argv_array, g_strdup (opts));
-    }
-#endif
 }
 
 static const struct {const char *env; const char *val;} default_exports[] = {
@@ -2482,12 +2474,6 @@ xdg_app_run_app (const char *app_ref,
                                     system_bus_proxy_argv,
                                     app_ref_parts[1], app_context, app_id_dir);
 
-#ifdef BUBBLE
-  if ((flags & XDG_APP_RUN_FLAG_DEVEL) != 0)
-    g_ptr_array_add (argv_array, g_strdup ("-c"));
-
-#endif
-
   add_font_path_args (argv_array);
 
   /* Must run this before spawning the dbus proxy, to ensure it
@@ -2503,18 +2489,6 @@ xdg_app_run_app (const char *app_ref,
 
   if (sync_fds[1] != -1)
     close (sync_fds[1]);
-
-
-#ifdef BUBBLE
-  g_ptr_array_add (argv_array, g_strdup ("-a"));
-  g_ptr_array_add (argv_array, g_file_get_path (app_files));
-#endif
-
-#ifdef BUBBLE
-  g_ptr_array_add (argv_array, g_strdup ("-I"));
-  g_ptr_array_add (argv_array, g_strdup (app_ref_parts[1]));
-  g_ptr_array_add (argv_array, g_file_get_path (runtime_files));
-#endif
 
   /* Do this after setting up everything in the home dir */
   add_args (argv_array,
