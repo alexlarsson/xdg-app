@@ -47,9 +47,10 @@ typedef enum {
   XDG_APP_CONTEXT_SHARED_IPC       = 1 << 1,
 } XdgAppContextShares;
 
+/* In numerical order of more privs */
 typedef enum {
-  XDG_APP_FILESYSTEM_MODE_READ_WRITE   = 1,
-  XDG_APP_FILESYSTEM_MODE_READ_ONLY    = 2,
+  XDG_APP_FILESYSTEM_MODE_READ_ONLY    = 1,
+  XDG_APP_FILESYSTEM_MODE_READ_WRITE   = 2,
 } XdgAppFilesystemMode;
 
 
@@ -76,6 +77,11 @@ static const char *xdg_app_context_sockets[] = {
   "session-bus",
   "system-bus",
   NULL
+};
+
+const char *dont_mount_in_root[] = {
+  ".", "..", "lib", "lib32", "lib64", "bin", "sbin", "usr", "boot", "root",
+  "tmp", "etc", "app", "run", "proc", "sys", "dev", "var", NULL
 };
 
 typedef enum {
@@ -1534,11 +1540,30 @@ xdg_app_run_add_extension_args (GPtrArray   *argv_array,
   return TRUE;
 }
 
+static void
+add_file_arg (GPtrArray *argv_array,
+              XdgAppFilesystemMode mode,
+              const char *path)
+{
+  struct stat st;
+
+  if (stat (path, &st) != 0)
+    return;
+
+  if (S_ISDIR (st.st_mode) ||
+      S_ISREG (st.st_mode))
+    {
+      add_args (argv_array,
+                (mode == XDG_APP_FILESYSTEM_MODE_READ_WRITE) ? "--bind" : "--ro-bind",
+                path, path, NULL);
+    }
+}
+
 void
 xdg_app_run_add_environment_args (GPtrArray *argv_array,
                                   char ***envp_p,
-				  GPtrArray *session_bus_proxy_argv,
-				  GPtrArray *system_bus_proxy_argv,
+                                  GPtrArray *session_bus_proxy_argv,
+                                  GPtrArray *system_bus_proxy_argv,
                                   const char *app_id,
                                   XdgAppContext *context,
                                   GFile *app_id_dir)
@@ -1575,27 +1600,41 @@ xdg_app_run_add_environment_args (GPtrArray *argv_array,
                   NULL);
     }
 
-#ifdef BUBBLE
   fs_mode = (XdgAppFilesystemMode)g_hash_table_lookup (context->filesystems, "host");
   if (fs_mode != 0)
     {
+      DIR *dir;
+      struct dirent *dirent;
+
       g_debug ("Allowing host-fs access");
-      if (fs_mode == XDG_APP_FILESYSTEM_MODE_READ_WRITE)
-        opts[i++] = 'F';
-      else
-        opts[i++] = 'f';
       home_access = TRUE;
+
+      g_print ("host fs mode %d\n", fs_mode);
+      /* Bind mount most dirs in / into the new root */
+      dir = opendir ("/");
+      if (dir != NULL)
+        {
+          while ((dirent = readdir (dir)))
+            {
+              g_autofree char *path = NULL;
+
+              if (g_strv_contains (dont_mount_in_root, dirent->d_name))
+                continue;
+
+              path = g_build_filename ("/", dirent->d_name, NULL);
+              add_file_arg (argv_array, fs_mode, path);
+            }
+        }
+      add_file_arg (argv_array, fs_mode, "/run/media");
     }
 
   home_mode = (XdgAppFilesystemMode)g_hash_table_lookup (context->filesystems, "home");
   if (home_mode != 0)
     {
       g_debug ("Allowing homedir access");
-      if (home_mode == XDG_APP_FILESYSTEM_MODE_READ_WRITE)
-        opts[i++] = 'H';
-      else
-        opts[i++] = 'h';
       home_access = TRUE;
+
+      add_file_arg (argv_array, MAX (home_mode, fs_mode), g_get_home_dir ());
     }
 
   if (!home_access)
@@ -1611,8 +1650,9 @@ xdg_app_run_add_environment_args (GPtrArray *argv_array,
 
           g_mkdir_with_parents (src, 0755);
 
-          g_ptr_array_add (argv_array, g_strdup ("-B"));
-          g_ptr_array_add (argv_array, g_strdup_printf ("%s=%s", dest, src));
+          add_args (argv_array,
+                    "--bind", src, dest,
+                    NULL);
         }
     }
 
@@ -1621,17 +1661,11 @@ xdg_app_run_add_environment_args (GPtrArray *argv_array,
     {
       const char *filesystem = key;
       XdgAppFilesystemMode mode = GPOINTER_TO_INT(value);
-      const char *mode_arg;
 
       if (value == NULL ||
           strcmp (filesystem, "host") == 0 ||
           strcmp (filesystem, "home") == 0)
         continue;
-
-      if (mode == XDG_APP_FILESYSTEM_MODE_READ_WRITE)
-        mode_arg = "-B";
-      else
-        mode_arg = "-b";
 
       if (g_str_has_prefix (filesystem, "xdg-"))
         {
@@ -1640,7 +1674,6 @@ xdg_app_run_add_environment_args (GPtrArray *argv_array,
           g_autofree char *subpath = NULL;
 
           path = get_user_dir_from_string (filesystem, &config_key, &rest);
-
           if (path == NULL)
             {
               g_warning ("Unsupported xdg dir %s\n", filesystem);
@@ -1659,7 +1692,6 @@ xdg_app_run_add_environment_args (GPtrArray *argv_array,
           subpath = g_build_filename (path, rest, NULL);
           if (g_file_test (subpath, G_FILE_TEST_EXISTS))
             {
-
               if (xdg_dirs_conf == NULL)
                 xdg_dirs_conf = g_string_new ("");
 
@@ -1667,8 +1699,7 @@ xdg_app_run_add_environment_args (GPtrArray *argv_array,
                 g_string_append_printf (xdg_dirs_conf, "%s=\"%s\"\n",
                                         config_key, path);
 
-              g_ptr_array_add (argv_array, g_strdup (mode_arg));
-              g_ptr_array_add (argv_array, g_strdup_printf ("%s", subpath));
+              add_file_arg (argv_array, mode, subpath);
             }
         }
       else if (g_str_has_prefix (filesystem, "~/"))
@@ -1677,22 +1708,21 @@ xdg_app_run_add_environment_args (GPtrArray *argv_array,
 
           path = g_build_filename (g_get_home_dir(), filesystem+2, NULL);
           if (g_file_test (path, G_FILE_TEST_EXISTS))
-            {
-              g_ptr_array_add (argv_array, g_strdup (mode_arg));
-              g_ptr_array_add (argv_array, g_strdup (path));
-            }
+            add_file_arg (argv_array, mode, path);
         }
       else if (g_str_has_prefix (filesystem, "/"))
         {
           if (g_file_test (filesystem, G_FILE_TEST_EXISTS))
-            {
-              g_ptr_array_add (argv_array, g_strdup (mode_arg));
-              g_ptr_array_add (argv_array, g_strdup_printf ("%s", filesystem));
-            }
+            add_file_arg (argv_array, mode, filesystem);
         }
       else
         g_warning ("Unexpected filesystem arg %s\n", filesystem);
     }
+
+  /* Do this after setting up everything in the home dir, so its not overwritten */
+  add_args (argv_array,
+            "--bind", gs_file_get_path_cached (app_id_dir), gs_file_get_path_cached (app_id_dir),
+            NULL);
 
   if (home_access  && app_id_dir != NULL)
     {
@@ -1701,8 +1731,9 @@ xdg_app_run_add_environment_args (GPtrArray *argv_array,
                                                     NULL);
       g_autofree char *path = g_build_filename (gs_file_get_path_cached (app_id_dir),
                                                 "config/user-dirs.dirs", NULL);
-      g_ptr_array_add (argv_array, g_strdup ("-b"));
-      g_ptr_array_add (argv_array, g_strdup_printf ("%s=%s", path, src_path));
+      add_args (argv_array,
+                "--ro-bind", src_path, path,
+                NULL);
     }
   else if (xdg_dirs_conf != NULL && app_id_dir != NULL)
     {
@@ -1716,16 +1747,20 @@ xdg_app_run_add_environment_args (GPtrArray *argv_array,
           close (fd);
           if (g_file_set_contents (tmp_path, xdg_dirs_conf->str, xdg_dirs_conf->len, NULL))
             {
-              path = g_build_filename (gs_file_get_path_cached (app_id_dir),
-                                       "config/user-dirs.dirs", NULL);
-              g_ptr_array_add (argv_array, g_strdup ("-M"));
-              g_ptr_array_add (argv_array, g_strdup_printf ("%s=%s", path, tmp_path));
+              int tmp_fd = open (tmp_path, O_RDONLY);
+              unlink (tmp_path);
+              if (tmp_fd)
+                {
+                  g_autofree char *tmp_fd_str = g_strdup_printf ("%d", tmp_fd);
+                  path = g_build_filename (gs_file_get_path_cached (app_id_dir),
+                                           "config/user-dirs.dirs", NULL);
+
+                  add_args (argv_array, "--file", tmp_fd_str, path, NULL);
+                }
             }
         }
       g_string_free (xdg_dirs_conf, TRUE);
     }
-
-#endif
 
   if (context->sockets & XDG_APP_CONTEXT_SOCKET_X11)
     {
@@ -2358,6 +2393,8 @@ setup_base_argv (GPtrArray *argv_array,
             "--bind", "/etc/machine-id", "/usr/etc/machine-id",
             "--bind-data", passwd_fd_str, "/usr/etc/passwd",
             "--bind-data", group_fd_str, "/usr/etc/group",
+            /* Always create a homedir to start from, although it may be covered later */
+            "--dir", g_get_home_dir (),
             NULL);
 
   for (i = 0; i < G_N_ELEMENTS(usr_links); i++)
@@ -2530,8 +2567,6 @@ xdg_app_run_app (const char *app_ref,
     close (sync_fds[1]);
 
   add_args (argv_array,
-            /* Do this after setting up everything in the home dir, so its not overwritten */
-            "--bind", gs_file_get_path_cached (app_id_dir), gs_file_get_path_cached (app_id_dir),
             /* Not in base, because we don't want this for xdg-app build */
             "--symlink", "/app/lib/debug/source", "/run/build",
             "--symlink", "/usr/lib/debug/source", "/run/build-runtime",
