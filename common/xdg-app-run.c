@@ -1186,7 +1186,8 @@ add_args (GPtrArray *argv_array, ...)
 }
 
 static void
-xdg_app_run_add_x11_args (GPtrArray *argv_array)
+xdg_app_run_add_x11_args (GPtrArray *argv_array,
+                          char ***envp_p)
 {
   char *x11_socket = NULL;
   const char *display = g_getenv ("DISPLAY");
@@ -1204,8 +1205,10 @@ xdg_app_run_add_x11_args (GPtrArray *argv_array)
       d = g_strndup (display_nr, display_nr_end - display_nr);
       x11_socket = g_strdup_printf ("/tmp/.X11-unix/X%s", d);
 
-      g_ptr_array_add (argv_array, g_strdup ("-x"));
-      g_ptr_array_add (argv_array, x11_socket);
+      add_args (argv_array,
+                "--bind", x11_socket, "/tmp/.X11-unix/X99",
+                NULL);
+      *envp_p = g_environ_setenv (*envp_p, "DISPLAY", ":99.0", TRUE);
 
 #ifdef ENABLE_XAUTH
       int fd;
@@ -1215,11 +1218,23 @@ xdg_app_run_add_x11_args (GPtrArray *argv_array)
           FILE *output = fdopen (fd, "wb");
           if (output != NULL)
             {
-              write_xauth (d, output);
-              fclose (output);
+              int tmp_fd = dup (fd);
+              if (tmp_fd != -1)
+                {
+                  g_autofree char *tmp_fd_str = g_strdup_printf ("%d", tmp_fd);
+                  g_autofree char *dest = g_strdup_printf ("/run/user/%d/Xauthority", getuid());
 
-              g_ptr_array_add (argv_array, g_strdup ("-M"));
-              g_ptr_array_add (argv_array, g_strdup_printf ("/run/user/%d/Xauthority=%s", getuid(), tmp_path));
+                  write_xauth (d, output);
+                  add_args (argv_array,
+                            "--bind-data", tmp_fd_str, dest,
+                            NULL);
+                  *envp_p = g_environ_setenv (*envp_p, "XAUTHORITY", dest, TRUE);
+                }
+
+              fclose (output);
+              unlink (tmp_path);
+
+              lseek (tmp_fd, 0, SEEK_SET);
             }
           else
             close (fd);
@@ -1630,12 +1645,15 @@ xdg_app_run_add_environment_args (GPtrArray *argv_array,
       g_string_free (xdg_dirs_conf, TRUE);
     }
 
+#endif
+
   if (context->sockets & XDG_APP_CONTEXT_SOCKET_X11)
     {
       g_debug ("Allowing x11 access");
-      xdg_app_run_add_x11_args (argv_array);
+      xdg_app_run_add_x11_args (argv_array, envp_p);
     }
 
+#ifdef BUBBLE
   if (context->sockets & XDG_APP_CONTEXT_SOCKET_WAYLAND)
     {
       g_debug ("Allowing wayland access");
