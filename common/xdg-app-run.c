@@ -1963,8 +1963,9 @@ add_font_path_args (GPtrArray *argv_array)
   g_autoptr(GFile) user_font1 = NULL;
   g_autoptr(GFile) user_font2 = NULL;
 
-  g_ptr_array_add (argv_array, g_strdup ("-b"));
-  g_ptr_array_add (argv_array, g_strdup_printf ("/run/host/fonts=%s", SYSTEM_FONTS_DIR));
+  add_args (argv_array,
+            "--bind", SYSTEM_FONTS_DIR, "/run/host/fonts",
+            NULL);
 
   home = g_file_new_for_path (g_get_home_dir ());
   user_font1 = g_file_resolve_relative_path (home, ".local/share/fonts");
@@ -1972,15 +1973,15 @@ add_font_path_args (GPtrArray *argv_array)
 
   if (g_file_query_exists (user_font1, NULL))
     {
-      g_autofree char *path = g_file_get_path (user_font1);
-      g_ptr_array_add (argv_array, g_strdup ("-b"));
-      g_ptr_array_add (argv_array, g_strdup_printf ("/run/host/user-fonts=%s", path));
+      add_args (argv_array,
+                "--bind", gs_file_get_path_cached (user_font1), "/run/host/user-fonts",
+                NULL);
     }
   else if (g_file_query_exists (user_font2, NULL))
     {
-      g_autofree char *path = g_file_get_path (user_font2);
-      g_ptr_array_add (argv_array, g_strdup ("-b"));
-      g_ptr_array_add (argv_array, g_strdup_printf ("/run/host/user-fonts=%s", path));
+      add_args (argv_array,
+                "--bind", gs_file_get_path_cached (user_font2), "/run/host/user-fonts",
+                NULL);
     }
 }
 
@@ -2473,10 +2474,9 @@ xdg_app_run_app (const char *app_ref,
   if ((flags & XDG_APP_RUN_FLAG_DEVEL) != 0)
     g_ptr_array_add (argv_array, g_strdup ("-c"));
 
-  add_font_path_args (argv_array);
-
 #endif
 
+  add_font_path_args (argv_array);
 
   /* Must run this before spawning the dbus proxy, to ensure it
      ends up in the app cgroup */
