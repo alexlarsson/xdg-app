@@ -87,6 +87,11 @@ typedef enum {
   XDG_APP_RUN_FLAG_BACKGROUND  = (1<<1),
 } XdgAppRunFlags;
 
+gboolean xdg_app_run_setup_base_argv (GPtrArray *argv_array,
+                                      GFile *runtime_files,
+                                      GFile *app_id_dir,
+                                      XdgAppRunFlags flags,
+                                      GError **error);
 gboolean xdg_app_run_app (const char *app_ref,
                           XdgAppDeploy *app_deploy,
                           XdgAppContext *extra_context,

@@ -1734,9 +1734,10 @@ xdg_app_run_add_environment_args (GPtrArray *argv_array,
     }
 
   /* Do this after setting up everything in the home dir, so its not overwritten */
-  add_args (argv_array,
-            "--bind", gs_file_get_path_cached (app_id_dir), gs_file_get_path_cached (app_id_dir),
-            NULL);
+  if (app_id_dir)
+    add_args (argv_array,
+              "--bind", gs_file_get_path_cached (app_id_dir), gs_file_get_path_cached (app_id_dir),
+              NULL);
 
   if (home_access  && app_id_dir != NULL)
     {
@@ -2540,19 +2541,15 @@ setup_seccomp (GPtrArray *argv_array,
 }
 #endif
 
-static gboolean
-setup_base_argv (GPtrArray *argv_array,
-                 GFile *runtime_files,
-                 GFile *app_files,
-                 GFile *app_id_dir,
-                 XdgAppRunFlags flags,
-                 GError **error)
+gboolean
+xdg_app_run_setup_base_argv (GPtrArray *argv_array,
+                             GFile *runtime_files,
+                             GFile *app_id_dir,
+                             XdgAppRunFlags flags,
+                             GError **error)
 {
   const char *usr_links[] = {"lib", "lib32", "lib64", "bin", "sbin", "etc"};
   g_autofree char *run_dir = g_strdup_printf ("/run/user/%d", getuid ());
-  g_autoptr(GFile) app_cache_dir = g_file_get_child (app_id_dir, "cache");
-  g_autoptr(GFile) app_data_dir = g_file_get_child (app_id_dir, "data");
-  g_autoptr(GFile) app_config_dir = g_file_get_child (app_id_dir, "config");
   int i;
   int passwd_fd = -1;
   g_autofree char *passwd_fd_str = NULL;
@@ -2584,10 +2581,6 @@ setup_base_argv (GPtrArray *argv_array,
 
   add_args (argv_array,
             "--unshare-pid",
-            "--ro-bind", gs_file_get_path_cached (runtime_files), "/usr",
-            "--lock-file", "/usr/.ref",
-            "--ro-bind", gs_file_get_path_cached (app_files), "/app",
-            "--lock-file", "/app/.ref",
             "--dev", "/dev",
             "--proc", "/proc",
             "--dir", "/tmp",
@@ -2601,16 +2594,26 @@ setup_base_argv (GPtrArray *argv_array,
             "--ro-bind", "/sys/class", "/sys/class",
             "--ro-bind", "/sys/dev", "/sys/dev",
             "--ro-bind", "/sys/devices", "/sys/devices",
-            /* These are nice to have as a fixed path */
-            "--bind", gs_file_get_path_cached (app_cache_dir), "/var/cache",
-            "--bind", gs_file_get_path_cached (app_data_dir), "/var/data",
-            "--bind", gs_file_get_path_cached (app_config_dir), "/var/config",
             "--bind", "/etc/machine-id", "/usr/etc/machine-id",
             "--bind-data", passwd_fd_str, "/usr/etc/passwd",
             "--bind-data", group_fd_str, "/usr/etc/group",
             /* Always create a homedir to start from, although it may be covered later */
             "--dir", g_get_home_dir (),
             NULL);
+
+  if (app_id_dir != NULL)
+    {
+      g_autoptr(GFile) app_cache_dir = g_file_get_child (app_id_dir, "cache");
+      g_autoptr(GFile) app_data_dir = g_file_get_child (app_id_dir, "data");
+      g_autoptr(GFile) app_config_dir = g_file_get_child (app_id_dir, "config");
+
+      add_args (argv_array,
+                /* These are nice to have as a fixed path */
+                "--bind", gs_file_get_path_cached (app_cache_dir), "/var/cache",
+                "--bind", gs_file_get_path_cached (app_data_dir), "/var/data",
+                "--bind", gs_file_get_path_cached (app_config_dir), "/var/config",
+                NULL);
+    }
 
   for (i = 0; i < G_N_ELEMENTS(usr_links); i++)
     {
@@ -2752,7 +2755,14 @@ xdg_app_run_app (const char *app_ref,
 
   g_ptr_array_add (argv_array, g_strdup (HELPER));
 
-  if (!setup_base_argv (argv_array, runtime_files, app_files, app_id_dir, flags, error))
+  add_args (argv_array,
+            "--ro-bind", gs_file_get_path_cached (runtime_files), "/usr",
+            "--lock-file", "/usr/.ref",
+            "--ro-bind", gs_file_get_path_cached (app_files), "/app",
+            "--lock-file", "/app/.ref",
+            NULL);
+
+  if (!xdg_app_run_setup_base_argv (argv_array, runtime_files, app_id_dir, flags, error))
     return FALSE;
 
   if (!add_app_info_args (argv_array, app_deploy, app_ref_parts[1], runtime_ref, app_context, error))
