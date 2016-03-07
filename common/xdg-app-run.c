@@ -1660,6 +1660,15 @@ xdg_app_run_add_environment_args (GPtrArray *argv_array,
                     NULL);
         }
     }
+  else
+    {
+      g_autofree char *dconf_run_path = g_strdup_printf ("/run/user/%d/dconf", getuid ());
+
+      /* If the user has homedir access, also allow dconf run dir access */
+      add_args (argv_array,
+                "--bind", dconf_run_path, dconf_run_path,
+                NULL);
+    }
 
   g_hash_table_iter_init (&iter, context->filesystems);
   while (g_hash_table_iter_next (&iter, &key, &value))
