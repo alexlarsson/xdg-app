@@ -25,7 +25,12 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/utsname.h>
+#include <sys/socket.h>
 #include <grp.h>
+
+#ifdef ENABLE_SECCOMP
+#include <seccomp.h>
+#endif
 
 #ifdef ENABLE_XAUTH
 #include <X11/Xauth.h>
@@ -2414,6 +2419,205 @@ setup_base_argv (GPtrArray *argv_array,
   return TRUE;
 }
 
+#ifdef ENABLE_SECCOMP
+static inline void
+cleanup_seccomp (void *p)
+{
+  scmp_filter_ctx *pp = (scmp_filter_ctx *)p;
+
+  if (*pp)
+    seccomp_release (*pp);
+}
+
+static gboolean
+setup_seccomp (GPtrArray *argv_array,
+               gboolean devel,
+               GError **error)
+{
+  __attribute__ ((cleanup(cleanup_seccomp))) scmp_filter_ctx seccomp = NULL;
+
+  /**** BEGIN NOTE ON CODE SHARING
+   *
+   * There are today a number of different Linux container
+   * implementations.  That will likely continue for long into the
+   * future.  But we can still try to share code, and it's important
+   * to do so because it affects what library and application writers
+   * can do, and we should support code portability between different
+   * container tools.
+   *
+   * This syscall blacklist is copied from xdg-app, which was in turn
+   * clearly influenced by the Sandstorm.io blacklist.
+   *
+   * If you make any changes here, I suggest sending the changes along
+   * to other sandbox maintainers.  Using the libseccomp list is also
+   * an appropriate venue:
+   * https://groups.google.com/forum/#!topic/libseccomp
+   *
+   * A non-exhaustive list of links to container tooling that might
+   * want to share this blacklist:
+   *
+   *  https://github.com/sandstorm-io/sandstorm
+   *    in src/sandstorm/supervisor.c++
+   *  http://cgit.freedesktop.org/xdg-app/xdg-app/
+   *    in lib/xdg-app-helper.c
+   *  https://git.gnome.org/browse/linux-user-chroot
+   *    in src/setup-seccomp.c
+   *
+   **** END NOTE ON CODE SHARING
+   */
+  struct {
+    int scall;
+    struct scmp_arg_cmp *arg;
+  } syscall_blacklist[] = {
+    /* Block dmesg */
+    {SCMP_SYS(syslog)},
+    /* Useless old syscall */
+    {SCMP_SYS(uselib)},
+    /* Don't allow you to switch to bsd emulation or whatnot */
+    {SCMP_SYS(personality)},
+    /* Don't allow disabling accounting */
+    {SCMP_SYS(acct)},
+    /* 16-bit code is unnecessary in the sandbox, and modify_ldt is a
+       historic source of interesting information leaks. */
+    {SCMP_SYS(modify_ldt)},
+    /* Don't allow reading current quota use */
+    {SCMP_SYS(quotactl)},
+
+    /* Scary VM/NUMA ops */
+    {SCMP_SYS(move_pages)},
+    {SCMP_SYS(mbind)},
+    {SCMP_SYS(get_mempolicy)},
+    {SCMP_SYS(set_mempolicy)},
+    {SCMP_SYS(migrate_pages)},
+
+    /* Don't allow subnamespace setups: */
+    {SCMP_SYS(unshare)},
+    {SCMP_SYS(mount)},
+    {SCMP_SYS(pivot_root)},
+    {SCMP_SYS(clone), &SCMP_A0(SCMP_CMP_MASKED_EQ, CLONE_NEWUSER, CLONE_NEWUSER)},
+  };
+
+  struct {
+    int scall;
+    struct scmp_arg_cmp *arg;
+  } syscall_nondevel_blacklist[] = {
+    /* Profiling operations; we expect these to be done by tools from outside
+     * the sandbox.  In particular perf has been the source of many CVEs.
+     */
+    {SCMP_SYS(perf_event_open)},
+    {SCMP_SYS(ptrace)}
+  };
+  /* Blacklist all but unix, inet, inet6 and netlink */
+  int socket_family_blacklist[] = {
+    AF_AX25,
+    AF_IPX,
+    AF_APPLETALK,
+    AF_NETROM,
+    AF_BRIDGE,
+    AF_ATMPVC,
+    AF_X25,
+    AF_ROSE,
+    AF_DECnet,
+    AF_NETBEUI,
+    AF_SECURITY,
+    AF_KEY,
+    AF_NETLINK + 1, /* Last gets CMP_GE, so order is important */
+  };
+  int i, r;
+  glnx_fd_close int fd = -1;
+  g_autofree char *fd_str = NULL;
+  struct utsname uts;
+  g_autofree char *path = NULL;
+
+  seccomp = seccomp_init (SCMP_ACT_ALLOW);
+  if (!seccomp)
+    return xdg_app_fail (error, "Initialize seccomp failed");
+
+  /* Add in all possible secondary archs we are aware of that
+   * this kernel might support. */
+#if defined(__i386__) || defined(__x86_64__)
+  r = seccomp_arch_add (seccomp, SCMP_ARCH_X86);
+  if (r < 0 && r != -EEXIST)
+    return xdg_app_fail (error, "Failed to add x86 architecture to seccomp filter");
+
+  r = seccomp_arch_add (seccomp, SCMP_ARCH_X86_64);
+  if (r < 0 && r != -EEXIST)
+    return xdg_app_fail (error, "Failed to add x86_64 architecture to seccomp filter");
+
+  r = seccomp_arch_add (seccomp, SCMP_ARCH_X32);
+  if (r < 0 && r != -EEXIST)
+    return xdg_app_fail (error, "Failed to add x32 architecture to seccomp filter");
+#endif
+
+  /* TODO: Should we filter the kernel keyring syscalls in some way?
+   * We do want them to be used by desktop apps, but they could also perhaps
+   * leak system stuff or secrets from other apps.
+   */
+
+  for (i = 0; i < G_N_ELEMENTS (syscall_blacklist); i++)
+    {
+      int scall = syscall_blacklist[i].scall;
+      if (syscall_blacklist[i].arg)
+        r = seccomp_rule_add (seccomp, SCMP_ACT_ERRNO(EPERM), scall, 1, *syscall_blacklist[i].arg);
+      else
+        r = seccomp_rule_add (seccomp, SCMP_ACT_ERRNO(EPERM), scall, 0);
+      if (r < 0 && r == -EFAULT /* unknown syscall */)
+        return xdg_app_fail (error, "Failed to block syscall %d", scall);
+    }
+
+  if (!devel)
+    {
+      for (i = 0; i < G_N_ELEMENTS (syscall_nondevel_blacklist); i++)
+        {
+          int scall = syscall_nondevel_blacklist[i].scall;
+          if (syscall_nondevel_blacklist[i].arg)
+            r = seccomp_rule_add (seccomp, SCMP_ACT_ERRNO(EPERM), scall, 1, *syscall_nondevel_blacklist[i].arg);
+          else
+            r = seccomp_rule_add (seccomp, SCMP_ACT_ERRNO(EPERM), scall, 0);
+
+          if (r < 0 && r == -EFAULT /* unknown syscall */)
+            return xdg_app_fail (error, "Failed to block syscall %d", scall);
+        }
+    }
+
+  /* Socket filtering doesn't work on x86 */
+  if (uname (&uts) == 0 && strcmp (uts.machine, "i686") != 0)
+    {
+      for (i = 0; i < G_N_ELEMENTS (socket_family_blacklist); i++)
+        {
+          int family = socket_family_blacklist[i];
+          if (i == G_N_ELEMENTS (socket_family_blacklist) - 1)
+            r = seccomp_rule_add (seccomp, SCMP_ACT_ERRNO(EAFNOSUPPORT), SCMP_SYS(socket), 1, SCMP_A0(SCMP_CMP_GE, family));
+          else
+            r = seccomp_rule_add (seccomp, SCMP_ACT_ERRNO(EAFNOSUPPORT), SCMP_SYS(socket), 1, SCMP_A0(SCMP_CMP_EQ, family));
+          if (r < 0)
+            return xdg_app_fail (error, "Failed to block socket family %d", family);
+        }
+    }
+
+  fd = g_file_open_tmp ("xdg-app-seccomp-XXXXXX", &path, error);
+  if (fd == -1)
+    return FALSE;
+
+  unlink (path);
+
+  if (seccomp_export_bpf (seccomp, fd) != 0)
+    return xdg_app_fail (error, "Failed to export bpf");
+
+  lseek (fd, 0, SEEK_SET);
+
+  fd_str = g_strdup_printf ("%d", fd);
+
+  add_args (argv_array,
+            "--seccomp", fd_str,
+            NULL);
+
+  fd = -1; /* Don't close on success */
+
+  return TRUE;
+}
+#endif
+
 gboolean
 xdg_app_run_app (const char *app_ref,
                  XdgAppDeploy *app_deploy,
@@ -2531,6 +2735,13 @@ xdg_app_run_app (const char *app_ref,
 
   if (!setup_base_argv (argv_array, runtime_files, app_files, app_id_dir, error))
     return FALSE;
+
+#ifdef ENABLE_SECCOMP
+  if (!setup_seccomp (argv_array,
+                      (flags & XDG_APP_RUN_FLAG_DEVEL) != 0,
+                      error))
+    return FALSE;
+#endif
 
   if (!add_app_info_args (argv_array, app_deploy, app_ref_parts[1], runtime_ref, app_context, error))
     return FALSE;
