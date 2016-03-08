@@ -26,6 +26,40 @@ static guint32 next_app_id = 1;
 
 G_LOCK_DEFINE(app_id);
 
+#ifdef TODO
+static int
+steal_fd (int *fdp)
+{
+  int fd = *fdp;
+  *fdp = -1;
+  return fd;
+}
+
+static int
+get_user_perms (const struct stat *stbuf)
+{
+  /* Strip out exec and setuid bits */
+  return stbuf->st_mode & 0666;
+}
+
+static double
+get_attr_cache_time (int st_mode)
+{
+  if (S_ISDIR (st_mode))
+    return DIRS_ATTR_CACHE_TIME;
+  return 0.0;
+}
+
+static double
+get_entry_cache_time (fuse_ino_t inode)
+{
+  /* We have to disable entry caches because otherwise we have a race
+     on rename. The kernel set the target inode as NOEXIST after a
+     rename, which breaks in the tmp over real case due to us reusing
+     the old non-temp inode. */
+  return 0.0;
+}
+#endif
 
 /******************************* XdpTmp *******************************
  *

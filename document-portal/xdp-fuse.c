@@ -23,8 +23,9 @@
 #define NON_DOC_DIR_PERMS 0500
 #define DOC_DIR_PERMS 0700
 
-/* The (fake) directories don't really change */
-#define DIRS_ATTR_CACHE_TIME 60.0
+/* TODO: What do we put here */
+#define ATTR_CACHE_TIME 1.0
+#define ENTRY_CACHE_TIME 1.0
 
 /* We pretend that the file is hardlinked. This causes most apps to do
    a truncating overwrite, which suits us better, as we do the atomic
@@ -52,8 +53,8 @@ struct _XdpInode {
   guint ref_count;
 };
 
-#define ROOT_INODE  0
-#define BY_APP_INODE  1
+#define ROOT_INODE  1
+#define BY_APP_INODE  2
 #define BY_APP_NAME "by-app"
 
 static GHashTable *app_name_to_inode_nr;
@@ -62,7 +63,7 @@ static GHashTable *doc_id_to_inode_nr;
 static GHashTable *inodes; /* The in memory XdpInode:s */
 static XdpInode *root_inode;
 static XdpInode *by_app_inode;
-static fuse_ino_t next_inode_nr = 2;
+static fuse_ino_t next_inode_nr = 3;
 
 G_LOCK_DEFINE(inodes);
 
@@ -71,41 +72,6 @@ static struct fuse_session *session = NULL;
 static struct fuse_chan *main_ch = NULL;
 static char *mount_path = NULL;
 static pthread_t fuse_pthread = 0;
-
-#ifdef TODO
-static int
-steal_fd (int *fdp)
-{
-  int fd = *fdp;
-  *fdp = -1;
-  return fd;
-}
-
-static int
-get_user_perms (const struct stat *stbuf)
-{
-  /* Strip out exec and setuid bits */
-  return stbuf->st_mode & 0666;
-}
-
-static double
-get_attr_cache_time (int st_mode)
-{
-  if (S_ISDIR (st_mode))
-    return DIRS_ATTR_CACHE_TIME;
-  return 0.0;
-}
-
-static double
-get_entry_cache_time (fuse_ino_t inode)
-{
-  /* We have to disable entry caches because otherwise we have a race
-     on rename. The kernel set the target inode as NOEXIST after a
-     rename, which breaks in the tmp over real case due to us reusing
-     the old non-temp inode. */
-  return 0.0;
-}
-#endif
 
 /* Call with inodes lock held */
 static fuse_ino_t
@@ -122,6 +88,7 @@ allocate_inode_nr (void)
 }
 
 static void xdp_inode_unref (XdpInode *inode);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(XdpInode, xdp_inode_unref)
 
 static void
 xdp_inode_destroy (XdpInode *inode)
@@ -157,6 +124,11 @@ xdp_inode_unref (XdpInode *inode)
     }
   else
     {
+      if (old_ref <= 0)
+        {
+          g_warning ("Can't unref dead inode");
+          return;
+        }
       /* Protect against revival from xdp_inode_lookup() */
       G_LOCK(inodes);
       if (!g_atomic_int_compare_and_exchange ((int *)&inode->ref_count, old_ref, old_ref - 1))
@@ -278,47 +250,163 @@ xdp_inode_get_doc_dir (const char *doc_id)
 }
 
 static void
+xdp_inode_stat (XdpInode *inode,
+                struct stat *stbuf)
+{
+  stbuf->st_ino = inode->ino;
+
+  switch (inode->type)
+    {
+    case XDP_INODE_ROOT:
+    case XDP_INODE_BY_APP:
+    case XDP_INODE_APP_DIR:
+      stbuf->st_mode = S_IFDIR | NON_DOC_DIR_PERMS;
+      stbuf->st_nlink = 2;
+      break;
+
+    case XDP_INODE_DOC_DIR:
+      stbuf->st_mode = S_IFDIR | DOC_DIR_PERMS;
+      stbuf->st_nlink = 2;
+      break;
+
+    case XDP_INODE_DOC_FILE:
+    default:
+      g_assert_not_reached ();
+    }
+}
+
+static void
 xdp_fuse_lookup (fuse_req_t req,
                  fuse_ino_t parent,
                  const char *name)
 {
-#ifdef TODO
+  g_autoptr(XdpInode) parent_inode = NULL;
   struct fuse_entry_param e = {0};
-  int res;
+  g_autoptr(XdpInode) child_inode = NULL;
 
   g_debug ("xdp_fuse_lookup %lx/%s -> ", parent, name);
 
-  memset (&e, 0, sizeof(e));
-
-  res = xdp_lookup (parent, name, &e.ino, &e.attr, NULL, NULL);
-
-  if (res == 0)
+  parent_inode = xdp_inode_lookup (parent);
+  if (parent_inode == NULL)
     {
-      g_debug ("xdp_fuse_lookup <- inode %lx", (long)e.ino);
-      e.attr_timeout = get_attr_cache_time (e.attr.st_mode);
-      e.entry_timeout = get_entry_cache_time (e.ino);
-      fuse_reply_entry (req, &e);
+      g_debug ("xdp_fuse_lookup <- error parent ENOENT");
+      fuse_reply_err (req, ENOENT);
+      return;
     }
-  else
+
+  switch (parent_inode->type)
     {
-      g_debug ("xdp_fuse_lookup <- error %s", strerror (res));
-      fuse_reply_err (req, res);
+    case XDP_INODE_ROOT:
+      if (strcmp (name, BY_APP_NAME) == 0)
+        child_inode = xdp_inode_ref (by_app_inode);
+      break;
+
+    case XDP_INODE_BY_APP:
+    case XDP_INODE_APP_DIR:
+    case XDP_INODE_DOC_DIR:
+    case XDP_INODE_DOC_FILE:
+    default:
+      break;
     }
-#endif
+
+  if (child_inode == NULL)
+    {
+      g_debug ("xdp_fuse_lookup <- error child ENOENT");
+      fuse_reply_err (req, ENOENT);
+      return;
+    }
+
+  xdp_inode_stat (child_inode, &e.attr);
+  xdp_inode_ref (child_inode); /* Ref given to the kernel */
+  e.ino = child_inode->ino;
+  e.attr_timeout = ATTR_CACHE_TIME;
+  e.entry_timeout = ENTRY_CACHE_TIME;
+
+  g_debug ("xdp_fuse_lookup <- inode %lx", (long)e.ino);
+  fuse_reply_entry (req, &e);
 }
 
 void
 xdp_fuse_forget (fuse_req_t req, fuse_ino_t ino, unsigned long nlookup)
 {
+  g_autoptr(XdpInode) inode = NULL;
+  g_debug ("xdp_fuse_forget %lx %ld -> ", ino, nlookup);
+
+  inode = xdp_inode_lookup (ino);
+  if (inode == NULL)
+    g_warning ("xdp_fuse_forget, unknown inode");
+  else
+    {
+      while (nlookup > 0)
+        {
+          xdp_inode_unref (inode);
+          nlookup--;
+        }
+    }
+
   fuse_reply_none (req);
+}
+
+static void
+xdp_fuse_getattr (fuse_req_t req,
+                  fuse_ino_t ino,
+                  struct fuse_file_info *fi)
+{
+  g_autoptr(XdpInode) inode = NULL;
+  struct stat stbuf = { 0 };
+
+  g_debug ("xdp_fuse_getattr %lx (fi=%p)", ino, fi);
+
+  inode = xdp_inode_lookup (ino);
+  if (inode == NULL)
+    {
+      g_debug ("xdp_fuse_getattr <- error ENOENT");
+      fuse_reply_err (req, ENOENT);
+      return;
+    }
+
+#ifdef TODO
+  g_autoptr(XdpFh) fh = NULL;
+  int res;
+
+
+  /* Fuse passes fi in to verify EOF during read/write/seek, but not during fstat */
+  if (fi != NULL)
+    {
+      XdpFh *fh = (gpointer)fi->fh;
+
+      res = xdp_fh_fstat_locked (fh, &stbuf);
+      if (res == 0)
+        {
+          fuse_reply_attr (req, &stbuf, get_attr_cache_time (stbuf.st_mode));
+          return;
+        }
+    }
+
+
+  fh = find_open_fh (ino);
+  if (fh)
+    {
+      res = xdp_fh_fstat_locked (fh, &stbuf);
+      if (res == 0)
+        {
+          fuse_reply_attr (req, &stbuf, get_attr_cache_time (stbuf.st_mode));
+          return;
+        }
+    }
+
+#endif
+
+  xdp_inode_stat (inode, &stbuf);
+  fuse_reply_attr (req, &stbuf, ATTR_CACHE_TIME);
 }
 
 
 static struct fuse_lowlevel_ops xdp_fuse_oper = {
   .lookup       = xdp_fuse_lookup,
   .forget       = xdp_fuse_forget,
-  /*
   .getattr      = xdp_fuse_getattr,
+  /*
   .opendir      = xdp_fuse_opendir,
   .readdir      = xdp_fuse_readdir,
   .releasedir   = xdp_fuse_releasedir,
