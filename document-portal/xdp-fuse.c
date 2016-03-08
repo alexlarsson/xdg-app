@@ -54,7 +54,39 @@ typedef enum {
   APP_DOC_FILE_INO_CLASS,
 } XdpInodeClass;
 
+typedef enum {
+  XDP_INODE_ROOT,
+  XDP_INODE_BY_APP,
+  XDP_INODE_APP_DIR, /* app id */
+  XDP_INODE_DOC_DIR, /* doc id */
+  XDP_INODE_DOC_FILE, /* doc id (NULL if tmp), name (== basename) */
+} XdpInodeType;
+
+typedef struct _XdpInode XdpInode;
+
+struct _XdpInode {
+  fuse_ino_t ino;
+  XdpInodeType type;
+  char *filename;
+  XdpInode *parent;
+  GList *children; /* lazily filled, protected by inodes lock */
+
+  guint ref_count;
+};
+
+#define ROOT_INODE  0
+#define BY_APP_INODE  1
 #define BY_APP_NAME "by-app"
+
+static GHashTable *app_name_to_inode_nr;
+static GHashTable *doc_id_to_inode_nr;
+
+static GHashTable *inodes; /* The in memory XdpInode:s */
+static XdpInode *root_inode;
+static XdpInode *by_app_inode;
+static fuse_ino_t next_inode_nr = 2;
+
+G_LOCK_DEFINE(inodes);
 
 static GHashTable *app_name_to_id;
 static GHashTable *app_id_to_name;
@@ -99,6 +131,176 @@ get_entry_cache_time (fuse_ino_t inode)
      rename, which breaks in the tmp over real case due to us reusing
      the old non-temp inode. */
   return 0.0;
+}
+
+/* Call with inodes lock held */
+static fuse_ino_t
+allocate_inode_unlocked (void)
+{
+  return next_inode_nr++;
+}
+
+static fuse_ino_t
+allocate_inode_nr (void)
+{
+  AUTOLOCK(inodes);
+  return allocate_inode_unlocked ();
+}
+
+static void xdp_inode_unref (XdpInode *inode);
+
+static void
+xdp_inode_destroy (XdpInode *inode)
+{
+  xdp_inode_unref (inode->parent);
+  g_free (inode->filename);
+  g_free (inode);
+}
+
+static XdpInode *
+xdp_inode_ref (XdpInode *inode)
+{
+  if (inode)
+    g_atomic_int_inc (&inode->ref_count);
+  return inode;
+}
+
+static void
+xdp_inode_unref (XdpInode *inode)
+{
+  gint old_ref;
+
+  if (inode == NULL)
+    return;
+
+  /* here we want to atomically do: if (ref_count>1) { ref_count--; return; } */
+ retry_atomic_decrement1:
+  old_ref = g_atomic_int_get (&inode->ref_count);
+  if (old_ref > 1)
+    {
+      if (!g_atomic_int_compare_and_exchange ((int *)&inode->ref_count, old_ref, old_ref - 1))
+        goto retry_atomic_decrement1;
+    }
+  else
+    {
+      /* Protect against revival from xdp_inode_lookup() */
+      G_LOCK(inodes);
+      if (!g_atomic_int_compare_and_exchange ((int *)&inode->ref_count, old_ref, old_ref - 1))
+        {
+          G_UNLOCK(inodes);
+          goto retry_atomic_decrement1;
+        }
+
+      g_hash_table_remove (inodes, (gpointer)inode->ino);
+      if (inode->parent)
+        inode->parent->children = g_list_remove (inode->parent->children, inode);
+
+      G_UNLOCK(inodes);
+
+      xdp_inode_destroy (inode);
+    }
+}
+
+static XdpInode *
+xdp_inode_new (fuse_ino_t ino,
+               XdpInodeType type,
+               XdpInode *parent,
+               const char *filename)
+{
+  XdpInode *inode;
+
+  inode = g_new0 (XdpInode, 1);
+  inode->ino = ino;
+  inode->type = type;
+  inode->parent = xdp_inode_ref (parent);
+  inode->filename = g_strdup (filename);
+  inode->ref_count = 1;
+
+  AUTOLOCK(inodes);
+  if (parent)
+    parent->children = g_list_prepend (parent->children, inode);
+  g_hash_table_insert (inodes, (gpointer)ino, inode);
+  return inode;
+}
+
+static XdpInode *
+xdp_inode_lookup_unlocked (fuse_ino_t inode_nr)
+{
+  XdpInode *inode;
+
+  inode = g_hash_table_lookup (inodes, (gpointer)inode_nr);
+  if (inode != NULL)
+    return xdp_inode_ref (inode);
+  return NULL;
+}
+
+static XdpInode *
+xdp_inode_lookup (fuse_ino_t inode_nr)
+{
+  AUTOLOCK(inodes);
+  return xdp_inode_lookup_unlocked (inode_nr);
+}
+
+static fuse_ino_t
+get_app_inode_nr_unlocked (const char *app_id)
+{
+  gpointer res;
+  fuse_ino_t allocated;
+
+  res = g_hash_table_lookup (app_name_to_inode_nr, app_id);
+  if (res != NULL)
+    return (fuse_ino_t)(gsize)res;
+
+  allocated = allocate_inode_unlocked ();
+  g_hash_table_insert (app_name_to_inode_nr, g_strdup (app_id), (gpointer)allocated);
+  return allocated;
+}
+
+static XdpInode *
+xdp_inode_get_app_dir (const char *app_id)
+{
+  fuse_ino_t ino;
+  XdpInode *inode;
+
+  AUTOLOCK(inodes);
+  ino = get_app_inode_nr_unlocked (app_id);
+
+  inode = xdp_inode_lookup_unlocked (ino);
+  if (inode)
+    return xdp_inode_ref (inode);
+
+  return xdp_inode_new (ino, XDP_INODE_APP_DIR, by_app_inode, app_id);
+}
+
+static fuse_ino_t
+get_doc_inode_nr_unlocked (const char *doc_id)
+{
+  gpointer res;
+  fuse_ino_t allocated;
+
+  res = g_hash_table_lookup (doc_id_to_inode_nr, doc_id);
+  if (res != NULL)
+    return (fuse_ino_t)(gsize)res;
+
+  allocated = allocate_inode_unlocked ();
+  g_hash_table_insert (doc_id_to_inode_nr, g_strdup (doc_id), (gpointer)allocated);
+  return allocated;
+}
+
+static XdpInode *
+xdp_inode_get_doc_dir (const char *doc_id)
+{
+  fuse_ino_t ino;
+  XdpInode *inode;
+
+  AUTOLOCK(inodes);
+  ino = get_doc_inode_nr_unlocked (doc_id);
+
+  inode = xdp_inode_lookup_unlocked (ino);
+  if (inode)
+    return xdp_inode_ref (inode);
+
+  return xdp_inode_new (ino, XDP_INODE_DOC_DIR, root_inode, doc_id);
 }
 
 /******************************* XdpTmp *******************************
@@ -2188,6 +2390,15 @@ xdp_fuse_init (GError **error)
   struct fuse_args args = FUSE_ARGS_INIT(G_N_ELEMENTS(argv), argv);
   struct stat st;
   const char *mount_path;
+
+  inodes =
+    g_hash_table_new_full (g_direct_hash, g_direct_equal, NULL, NULL);
+  root_inode = xdp_inode_new (ROOT_INODE, XDP_INODE_ROOT, NULL, "/");
+  by_app_inode = xdp_inode_new (BY_APP_INODE, XDP_INODE_BY_APP, root_inode, BY_APP_NAME);
+  app_name_to_inode_nr =
+    g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
+  doc_id_to_inode_nr =
+    g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
 
   app_name_to_id =
     g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
