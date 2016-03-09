@@ -7,7 +7,7 @@
 G_BEGIN_DECLS
 
 char **        xdp_list_apps  (void);
-guint32 *      xdp_list_docs  (void);
+char **        xdp_list_docs  (void);
 XdgAppDbEntry *xdp_lookup_doc (const char *doc_id);
 
 gboolean    xdp_fuse_init               (GError     **error);

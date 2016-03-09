@@ -119,6 +119,45 @@ get_dir_inode_nr_unlocked (const char *app_id, const char *doc_id)
   return allocated;
 }
 
+static fuse_ino_t
+get_dir_inode_nr (const char *app_id, const char *doc_id)
+{
+  AUTOLOCK(inodes);
+  return get_dir_inode_nr_unlocked (app_id, doc_id);
+}
+
+static void
+allocate_app_dir_inode_nr (char **app_ids)
+{
+  int i;
+  AUTOLOCK(inodes);
+  for (i = 0; app_ids[i] != NULL; i++)
+    get_dir_inode_nr_unlocked (app_ids[i], NULL);
+}
+
+static char **
+get_allocated_app_dirs (void)
+{
+  GHashTableIter iter;
+  gpointer key, value;
+  GPtrArray *array = g_ptr_array_new ();
+
+  AUTOLOCK(inodes);
+  g_hash_table_iter_init (&iter, dir_to_inode_nr);
+  while (g_hash_table_iter_next (&iter, &key, &value))
+    {
+      const char *name = key;
+
+      if (g_str_has_suffix (name, "/"))
+        {
+          char *app = strndup (name, strlen (name) - 1);
+          g_ptr_array_add (array, app);
+        }
+    }
+  g_ptr_array_add (array, NULL);
+  return (char **)g_ptr_array_free (array, FALSE);
+}
+
 static void xdp_inode_unref_internal (XdpInode *inode, gboolean locked);
 static void xdp_inode_unref (XdpInode *inode);
 
@@ -391,6 +430,8 @@ xdp_fuse_lookup (fuse_req_t req,
 
     case XDP_INODE_APP_DOC_DIR:
     case XDP_INODE_DOC_DIR:
+      break;
+
     case XDP_INODE_DOC_FILE:
     default:
       break;
@@ -404,12 +445,12 @@ xdp_fuse_lookup (fuse_req_t req,
     }
 
   xdp_inode_stat (child_inode, &e.attr);
-  xdp_inode_ref (child_inode); /* Ref given to the kernel */
   e.ino = child_inode->ino;
   e.attr_timeout = ATTR_CACHE_TIME;
   e.entry_timeout = ENTRY_CACHE_TIME;
 
   g_debug ("xdp_fuse_lookup <- inode %lx", (long)e.ino);
+  xdp_inode_ref (child_inode); /* Ref given to the kernel, returned in xdp_fuse_forget() */
   fuse_reply_entry (req, &e);
 }
 
@@ -433,6 +474,220 @@ xdp_fuse_forget (fuse_req_t req, fuse_ino_t ino, unsigned long nlookup)
 
   fuse_reply_none (req);
 }
+
+struct dirbuf {
+  char *p;
+  size_t size;
+};
+
+static void
+dirbuf_add (fuse_req_t req,
+            struct dirbuf *b,
+            const char *name,
+            fuse_ino_t ino,
+            mode_t mode)
+{
+  struct stat stbuf;
+
+  size_t oldsize = b->size;
+  b->size += fuse_add_direntry (req, NULL, 0, name, NULL, 0);
+  b->p = (char *) g_realloc (b->p, b->size);
+  memset (&stbuf, 0, sizeof (stbuf));
+  stbuf.st_ino = ino;
+  stbuf.st_mode = mode;
+  fuse_add_direntry (req, b->p + oldsize,
+                     b->size - oldsize,
+                     name, &stbuf,
+                     b->size);
+}
+
+static void
+dirbuf_add_docs (fuse_req_t req,
+                 struct dirbuf *b,
+                 const char *app_id)
+{
+  g_auto(GStrv) docs = NULL;
+  fuse_ino_t ino;
+  int i;
+
+  docs = xdp_list_docs ();
+  for (i = 0; docs[i] != NULL; i++)
+    {
+      if (app_id)
+        {
+          g_autoptr(XdgAppDbEntry) entry = xdp_lookup_doc (docs[i]);
+          if (entry == NULL ||
+              !app_can_see_doc (entry, app_id))
+            continue;
+        }
+      ino = get_dir_inode_nr (app_id, docs[i]);
+      dirbuf_add (req, b, docs[i], ino, S_IFDIR);
+    }
+}
+
+#ifdef TODO
+static void
+dirbuf_add_doc_file (fuse_req_t req,
+                     struct dirbuf *b,
+                     XdgAppDbEntry *entry,
+                     guint32 doc_id,
+                     guint32 app_id)
+{
+  struct stat tmp_stbuf;
+  guint64 inode;
+  g_autofree char *basename = xdp_entry_dup_basename (entry);
+
+  inode = make_app_doc_file_inode (app_id, doc_id);
+
+  if (xdp_entry_stat (entry, &tmp_stbuf, AT_SYMLINK_NOFOLLOW) == 0)
+    dirbuf_add (req, b, basename, inode);
+}
+
+static void
+dirbuf_add_tmp_files (fuse_req_t req,
+                      struct dirbuf *b,
+                      guint64 dir_inode)
+{
+  GList *l;
+
+  AUTOLOCK(tmp_files);
+
+  for (l = tmp_files; l != NULL; l = l->next)
+    {
+      XdpTmp *tmp = l->data;
+      if (tmp->parent_inode == dir_inode)
+        dirbuf_add (req, b, tmp->name,
+                    make_inode (TMPFILE_INO_CLASS, tmp->tmp_id));
+    }
+}
+#endif
+
+static int
+reply_buf_limited (fuse_req_t req,
+                   const char *buf,
+                   size_t bufsize,
+                   off_t off,
+                   size_t maxsize)
+{
+  if (off < bufsize)
+    return fuse_reply_buf (req, buf + off,
+                           MIN (bufsize - off, maxsize));
+  else
+    return fuse_reply_buf (req, NULL, 0);
+}
+
+static void
+xdp_fuse_readdir (fuse_req_t req, fuse_ino_t ino, size_t size,
+                  off_t off, struct fuse_file_info *fi)
+{
+  struct dirbuf *b = (struct dirbuf *)(fi->fh);
+
+  reply_buf_limited (req, b->p, b->size, off, size);
+}
+
+static void
+xdp_fuse_opendir (fuse_req_t req,
+                  fuse_ino_t ino,
+                  struct fuse_file_info *fi)
+{
+  g_autoptr(XdpInode) inode = NULL;
+  struct dirbuf b = {0};
+  g_autoptr (XdgAppDbEntry) entry = NULL;
+
+  g_debug ("xdp_fuse_opendir %lx", ino);
+
+  inode = xdp_inode_lookup (ino);
+  if (inode == NULL)
+    {
+      g_debug ("xdp_fuse_opendir <- error ENOENT");
+      fuse_reply_err (req, ENOENT);
+      return;
+    }
+
+  switch (inode->type)
+    {
+    case XDP_INODE_ROOT:
+      dirbuf_add (req, &b, ".", ROOT_INODE, S_IFDIR);
+      dirbuf_add (req, &b, "..", ROOT_INODE, S_IFDIR);
+      dirbuf_add (req, &b, BY_APP_NAME, BY_APP_INODE, S_IFDIR);
+      dirbuf_add_docs (req, &b, NULL);
+      break;
+
+    case XDP_INODE_BY_APP:
+      {
+        g_auto(GStrv) db_app_ids = NULL;
+        g_auto(GStrv) app_ids = NULL;
+        int i;
+
+        dirbuf_add (req, &b, ".", BY_APP_INODE, S_IFDIR);
+        dirbuf_add (req, &b, "..", ROOT_INODE, S_IFDIR);
+
+        /* Ensure that all apps from db are allocated */
+        db_app_ids = xdp_list_apps ();
+        allocate_app_dir_inode_nr (db_app_ids);
+
+        /* But return all allocated dirs. We might have app dirs
+           that have no permissions, and are thus not in the db */
+        app_ids = get_allocated_app_dirs ();
+        for (i = 0; app_ids[i] != NULL; i++)
+          dirbuf_add (req, &b, app_ids[i],
+                      get_dir_inode_nr (app_ids[i], NULL), S_IFDIR);
+      }
+      break;
+
+    case XDP_INODE_APP_DIR:
+      dirbuf_add (req, &b, ".", inode->ino, S_IFDIR);
+      dirbuf_add (req, &b, "..", BY_APP_INODE, S_IFDIR);
+      dirbuf_add_docs (req, &b, inode->app_id);
+      break;
+
+    case XDP_INODE_DOC_FILE:
+      fuse_reply_err (req, ENOTDIR);
+      break;
+
+    case XDP_INODE_APP_DOC_DIR:
+    case XDP_INODE_DOC_DIR:
+      dirbuf_add (req, &b, ".", inode->ino, S_IFDIR);
+      dirbuf_add (req, &b, "..", inode->parent->ino, S_IFDIR);
+
+#ifdef TODO
+      dirbuf_add_doc_file (req, &b, entry,
+                           get_doc_id_from_app_doc_ino (class_ino),
+                           get_app_id_from_app_doc_ino (class_ino));
+      dirbuf_add_tmp_files (req, &b, ino);
+      break;
+#endif
+
+      break;
+
+    default:
+      g_assert_not_reached ();
+    }
+
+  if (b.p == NULL)
+    fuse_reply_err (req, ENOTDIR);
+  else
+    {
+      fi->fh = (gsize)g_memdup (&b, sizeof (b));
+      if (fuse_reply_open (req, fi) == -ENOENT)
+        {
+          g_free (b.p);
+          g_free ((gpointer)(fi->fh));
+        }
+    }
+}
+
+static void
+xdp_fuse_releasedir (fuse_req_t req,
+                     fuse_ino_t ino,
+                     struct fuse_file_info *fi)
+{
+  struct dirbuf *b = (struct dirbuf *)(fi->fh);
+  g_free (b->p);
+  g_free (b);
+  fuse_reply_err (req, 0);
+}
+
 
 static void
 xdp_fuse_getattr (fuse_req_t req,
@@ -493,10 +748,10 @@ static struct fuse_lowlevel_ops xdp_fuse_oper = {
   .lookup       = xdp_fuse_lookup,
   .forget       = xdp_fuse_forget,
   .getattr      = xdp_fuse_getattr,
-  /*
   .opendir      = xdp_fuse_opendir,
   .readdir      = xdp_fuse_readdir,
   .releasedir   = xdp_fuse_releasedir,
+  /*
   .fsyncdir     = xdp_fuse_fsyncdir,
   .open         = xdp_fuse_open,
   .create       = xdp_fuse_create,

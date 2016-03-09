@@ -51,30 +51,11 @@ xdp_list_apps (void)
   return xdg_app_db_list_apps (db);
 }
 
-guint32 *
+char **
 xdp_list_docs (void)
 {
-  GArray *res;
-  g_auto(GStrv) ids = NULL;
-  guint32 id;
-  int i;
-
   AUTOLOCK(db);
-
-  res = g_array_new (TRUE, FALSE, sizeof (guint32));
-
-  ids = xdg_app_db_list_ids (db);
-
-  for (i = 0; ids[i] != NULL; i++)
-    {
-      guint32 id = xdp_id_from_name (ids[i]);
-      g_array_append_val (res, id);
-    }
-
-  id = 0;
-  g_array_append_val (res, id);
-
-  return (guint32 *)g_array_free (res, FALSE);
+  return xdg_app_db_list_ids (db);
 }
 
 XdgAppDbEntry *
