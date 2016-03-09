@@ -37,6 +37,7 @@ typedef enum {
   XDP_INODE_ROOT,
   XDP_INODE_BY_APP,
   XDP_INODE_APP_DIR, /* app id */
+  XDP_INODE_APP_DOC_DIR, /* app_id + doc id */
   XDP_INODE_DOC_DIR, /* doc id */
   XDP_INODE_DOC_FILE, /* doc id (NULL if tmp), name (== basename) */
 } XdpInodeType;
@@ -44,23 +45,28 @@ typedef enum {
 typedef struct _XdpInode XdpInode;
 
 struct _XdpInode {
+  /* These are all constant */
   fuse_ino_t ino;
   XdpInodeType type;
-  char *filename;
   XdpInode *parent;
+  char *app_id;
+  char *doc_id;
+
+  /* Can change for tmp files */
+  char *filename;
+
   GList *children; /* lazily filled, protected by inodes lock */
 
-  guint ref_count;
+  gint ref_count;
 };
 
 #define ROOT_INODE  1
 #define BY_APP_INODE  2
 #define BY_APP_NAME "by-app"
 
-static GHashTable *app_name_to_inode_nr;
-static GHashTable *doc_id_to_inode_nr;
+static GHashTable *dir_to_inode_nr;
 
-static GHashTable *inodes; /* The in memory XdpInode:s */
+static GHashTable *inodes; /* The in memory XdpInode:s, protected by inodes lock */
 static XdpInode *root_inode;
 static XdpInode *by_app_inode;
 static fuse_ino_t next_inode_nr = 3;
@@ -87,14 +93,49 @@ allocate_inode_nr (void)
   return allocate_inode_unlocked ();
 }
 
+static fuse_ino_t
+get_dir_inode_nr_unlocked (const char *app_id, const char *doc_id)
+{
+  gpointer res;
+  fuse_ino_t allocated;
+  g_autofree char *free_me = NULL;
+  const char *dir = NULL;
+
+  if (app_id == NULL)
+    dir = doc_id;
+  else
+    {
+      if (doc_id == NULL)
+        dir = app_id;
+      else
+        {
+          free_me = g_build_filename (app_id, doc_id, NULL);
+          dir = free_me;
+        }
+    }
+
+  res = g_hash_table_lookup (dir_to_inode_nr, dir);
+  if (res != NULL)
+    return (fuse_ino_t)(gsize)res;
+
+  allocated = allocate_inode_unlocked ();
+  g_hash_table_insert (dir_to_inode_nr, g_strdup (dir), (gpointer)allocated);
+  return allocated;
+}
+
+static void xdp_inode_unref_internal (XdpInode *inode, gboolean locked);
 static void xdp_inode_unref (XdpInode *inode);
+
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(XdpInode, xdp_inode_unref)
 
 static void
-xdp_inode_destroy (XdpInode *inode)
+xdp_inode_destroy (XdpInode *inode, gboolean locked)
 {
-  xdp_inode_unref (inode->parent);
+  g_assert (inode->children == NULL);
+  xdp_inode_unref_internal (inode->parent, locked);
   g_free (inode->filename);
+  g_free (inode->app_id);
+  g_free (inode->doc_id);
   g_free (inode);
 }
 
@@ -107,7 +148,7 @@ xdp_inode_ref (XdpInode *inode)
 }
 
 static void
-xdp_inode_unref (XdpInode *inode)
+xdp_inode_unref_internal (XdpInode *inode, gboolean locked)
 {
   gint old_ref;
 
@@ -130,10 +171,12 @@ xdp_inode_unref (XdpInode *inode)
           return;
         }
       /* Protect against revival from xdp_inode_lookup() */
-      G_LOCK(inodes);
+      if (!locked)
+        G_LOCK(inodes);
       if (!g_atomic_int_compare_and_exchange ((int *)&inode->ref_count, old_ref, old_ref - 1))
         {
-          G_UNLOCK(inodes);
+          if (!locked)
+            G_UNLOCK(inodes);
           goto retry_atomic_decrement1;
         }
 
@@ -141,17 +184,26 @@ xdp_inode_unref (XdpInode *inode)
       if (inode->parent)
         inode->parent->children = g_list_remove (inode->parent->children, inode);
 
-      G_UNLOCK(inodes);
+      if (!locked)
+        G_UNLOCK(inodes);
 
-      xdp_inode_destroy (inode);
+      xdp_inode_destroy (inode, locked);
     }
 }
 
+static void
+xdp_inode_unref (XdpInode *inode)
+{
+  return xdp_inode_unref_internal (inode, FALSE);
+}
+
 static XdpInode *
-xdp_inode_new (fuse_ino_t ino,
-               XdpInodeType type,
-               XdpInode *parent,
-               const char *filename)
+xdp_inode_new_unlocked (fuse_ino_t ino,
+                        XdpInodeType type,
+                        XdpInode *parent,
+                        const char *filename,
+                        const char *app_id,
+                        const char *doc_id)
 {
   XdpInode *inode;
 
@@ -160,13 +212,27 @@ xdp_inode_new (fuse_ino_t ino,
   inode->type = type;
   inode->parent = xdp_inode_ref (parent);
   inode->filename = g_strdup (filename);
+  inode->app_id = g_strdup (app_id);
+  inode->doc_id = g_strdup (doc_id);
   inode->ref_count = 1;
 
-  AUTOLOCK(inodes);
   if (parent)
     parent->children = g_list_prepend (parent->children, inode);
   g_hash_table_insert (inodes, (gpointer)ino, inode);
+
   return inode;
+}
+
+static XdpInode *
+xdp_inode_new (fuse_ino_t ino,
+               XdpInodeType type,
+               XdpInode *parent,
+               const char *filename,
+               const char *app_id,
+               const char *doc_id)
+{
+  AUTOLOCK(inodes);
+  return xdp_inode_new_unlocked (ino, type, parent, filename, app_id, doc_id);
 }
 
 static XdpInode *
@@ -187,67 +253,60 @@ xdp_inode_lookup (fuse_ino_t inode_nr)
   return xdp_inode_lookup_unlocked (inode_nr);
 }
 
-static fuse_ino_t
-get_app_inode_nr_unlocked (const char *app_id)
-{
-  gpointer res;
-  fuse_ino_t allocated;
-
-  res = g_hash_table_lookup (app_name_to_inode_nr, app_id);
-  if (res != NULL)
-    return (fuse_ino_t)(gsize)res;
-
-  allocated = allocate_inode_unlocked ();
-  g_hash_table_insert (app_name_to_inode_nr, g_strdup (app_id), (gpointer)allocated);
-  return allocated;
-}
-
 static XdpInode *
-xdp_inode_get_app_dir (const char *app_id)
+xdp_inode_get_dir_unlocked (const char *app_id, const char *doc_id)
 {
   fuse_ino_t ino;
   XdpInode *inode;
+  XdpInode *parent = NULL;
+  XdpInodeType type;
+  const char *filename;
 
-  AUTOLOCK(inodes);
-  ino = get_app_inode_nr_unlocked (app_id);
+  ino = get_dir_inode_nr_unlocked (app_id, doc_id);
 
   inode = xdp_inode_lookup_unlocked (ino);
   if (inode)
-    return xdp_inode_ref (inode);
+    return inode;
 
-  return xdp_inode_new (ino, XDP_INODE_APP_DIR, by_app_inode, app_id);
-}
+  if (app_id == NULL)
+    {
+      g_assert (doc_id != NULL);
+      parent = xdp_inode_ref (root_inode);
+      type = XDP_INODE_DOC_DIR;
+      filename = doc_id;
+    }
+  else
+    {
+      if  (doc_id == NULL)
+        {
+          parent = xdp_inode_ref (by_app_inode);
+          filename = app_id;
+          type = XDP_INODE_APP_DIR;
+        }
+      else
+        {
+          parent = xdp_inode_get_dir_unlocked (app_id, NULL);
+          filename = doc_id;
+          type = XDP_INODE_APP_DOC_DIR;
+        }
+    }
 
-static fuse_ino_t
-get_doc_inode_nr_unlocked (const char *doc_id)
-{
-  gpointer res;
-  fuse_ino_t allocated;
-
-  res = g_hash_table_lookup (doc_id_to_inode_nr, doc_id);
-  if (res != NULL)
-    return (fuse_ino_t)(gsize)res;
-
-  allocated = allocate_inode_unlocked ();
-  g_hash_table_insert (doc_id_to_inode_nr, g_strdup (doc_id), (gpointer)allocated);
-  return allocated;
+  inode = xdp_inode_new_unlocked (ino, type, parent, filename, app_id, doc_id);
+  xdp_inode_unref_internal (parent, TRUE);
+  return inode;
 }
 
 static XdpInode *
-xdp_inode_get_doc_dir (const char *doc_id)
+xdp_inode_get_dir (const char *app_id, const char *doc_id)
 {
-  fuse_ino_t ino;
-  XdpInode *inode;
-
   AUTOLOCK(inodes);
-  ino = get_doc_inode_nr_unlocked (doc_id);
-
-  inode = xdp_inode_lookup_unlocked (ino);
-  if (inode)
-    return xdp_inode_ref (inode);
-
-  return xdp_inode_new (ino, XDP_INODE_DOC_DIR, root_inode, doc_id);
+  return xdp_inode_get_dir_unlocked (app_id, doc_id);
 }
+
+/********************************************************************** \
+ * FUSE Implementation, all uses here should avoid the _unlocked
+ * versions and handle concurrency wrt access to inodes lock
+\***********************************************************************/
 
 static void
 xdp_inode_stat (XdpInode *inode,
@@ -265,6 +324,7 @@ xdp_inode_stat (XdpInode *inode,
       break;
 
     case XDP_INODE_DOC_DIR:
+    case XDP_INODE_APP_DOC_DIR:
       stbuf->st_mode = S_IFDIR | DOC_DIR_PERMS;
       stbuf->st_nlink = 2;
       break;
@@ -283,6 +343,7 @@ xdp_fuse_lookup (fuse_req_t req,
   g_autoptr(XdpInode) parent_inode = NULL;
   struct fuse_entry_param e = {0};
   g_autoptr(XdpInode) child_inode = NULL;
+  g_autoptr (XdgAppDbEntry) entry = NULL;
 
   g_debug ("xdp_fuse_lookup %lx/%s -> ", parent, name);
 
@@ -299,10 +360,18 @@ xdp_fuse_lookup (fuse_req_t req,
     case XDP_INODE_ROOT:
       if (strcmp (name, BY_APP_NAME) == 0)
         child_inode = xdp_inode_ref (by_app_inode);
+      else
+        {
+          entry = xdp_lookup_doc (name);
+          g_print ("entry %p", entry);
+          if (entry != NULL)
+            child_inode = xdp_inode_get_dir (NULL, name);
+        }
       break;
 
     case XDP_INODE_BY_APP:
     case XDP_INODE_APP_DIR:
+    case XDP_INODE_APP_DOC_DIR:
     case XDP_INODE_DOC_DIR:
     case XDP_INODE_DOC_FILE:
     default:
@@ -536,13 +605,10 @@ xdp_fuse_init (GError **error)
 
   inodes =
     g_hash_table_new_full (g_direct_hash, g_direct_equal, NULL, NULL);
-  root_inode = xdp_inode_new (ROOT_INODE, XDP_INODE_ROOT, NULL, "/");
-  by_app_inode = xdp_inode_new (BY_APP_INODE, XDP_INODE_BY_APP, root_inode, BY_APP_NAME);
-  app_name_to_inode_nr =
+  root_inode = xdp_inode_new (ROOT_INODE, XDP_INODE_ROOT, NULL, "/", NULL, NULL);
+  by_app_inode = xdp_inode_new (BY_APP_INODE, XDP_INODE_BY_APP, root_inode, BY_APP_NAME, NULL, NULL);
+  dir_to_inode_nr =
     g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
-  doc_id_to_inode_nr =
-    g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
-
 
   mount_path = xdp_fuse_get_mountpoint ();
 

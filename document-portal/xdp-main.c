@@ -78,10 +78,8 @@ xdp_list_docs (void)
 }
 
 XdgAppDbEntry *
-xdp_lookup_doc (guint32 id)
+xdp_lookup_doc (const char *doc_id)
 {
-  g_autofree char *doc_id = xdp_name_from_id (id);
-
   AUTOLOCK(db);
   return xdg_app_db_lookup (db, doc_id);
 }
