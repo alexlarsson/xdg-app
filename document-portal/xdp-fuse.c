@@ -83,7 +83,13 @@ static pthread_t fuse_pthread = 0;
 static fuse_ino_t
 allocate_inode_unlocked (void)
 {
-  return next_inode_nr++;
+  fuse_ino_t next = next_inode_nr++;
+
+  /* Bail out on overflow, to avoid reuse */
+  if (next <= 0)
+    g_assert_not_reached ();
+
+  return next;
 }
 
 static fuse_ino_t
