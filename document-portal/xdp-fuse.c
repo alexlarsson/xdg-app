@@ -98,20 +98,16 @@ get_dir_inode_nr_unlocked (const char *app_id, const char *doc_id)
 {
   gpointer res;
   fuse_ino_t allocated;
-  g_autofree char *free_me = NULL;
-  const char *dir = NULL;
+  g_autofree char *dir = NULL;
 
   if (app_id == NULL)
-    dir = doc_id;
+    dir = g_strdup (doc_id);
   else
     {
       if (doc_id == NULL)
-        dir = app_id;
+        dir = g_strconcat (app_id, "/", NULL);
       else
-        {
-          free_me = g_build_filename (app_id, doc_id, NULL);
-          dir = free_me;
-        }
+        dir = g_build_filename (app_id, doc_id, NULL);
     }
 
   res = g_hash_table_lookup (dir_to_inode_nr, dir);
@@ -308,6 +304,18 @@ xdp_inode_get_dir (const char *app_id, const char *doc_id)
  * versions and handle concurrency wrt access to inodes lock
 \***********************************************************************/
 
+static gboolean
+app_can_see_doc (XdgAppDbEntry *entry, const char *app_id)
+{
+  if (app_id == NULL)
+    return TRUE;
+
+  if (xdp_entry_has_permissions (entry, app_id, XDP_PERMISSION_FLAGS_READ))
+    return TRUE;
+
+  return FALSE;
+}
+
 static void
 xdp_inode_stat (XdpInode *inode,
                 struct stat *stbuf)
@@ -363,14 +371,24 @@ xdp_fuse_lookup (fuse_req_t req,
       else
         {
           entry = xdp_lookup_doc (name);
-          g_print ("entry %p", entry);
           if (entry != NULL)
             child_inode = xdp_inode_get_dir (NULL, name);
         }
       break;
 
     case XDP_INODE_BY_APP:
+      /* This lazily creates the app dir */
+      if (xdg_app_is_valid_name (name))
+        child_inode = xdp_inode_get_dir (name, NULL);
+      break;
+
     case XDP_INODE_APP_DIR:
+      entry = xdp_lookup_doc (name);
+      if (entry != NULL &&
+          app_can_see_doc (entry, parent_inode->app_id))
+        child_inode = xdp_inode_get_dir (parent_inode->app_id, name);
+      break;
+
     case XDP_INODE_APP_DOC_DIR:
     case XDP_INODE_DOC_DIR:
     case XDP_INODE_DOC_FILE:
