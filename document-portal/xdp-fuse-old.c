@@ -35,13 +35,6 @@ steal_fd (int *fdp)
   return fd;
 }
 
-static int
-get_user_perms (const struct stat *stbuf)
-{
-  /* Strip out exec and setuid bits */
-  return stbuf->st_mode & 0666;
-}
-
 static double
 get_attr_cache_time (int st_mode)
 {
@@ -643,36 +636,6 @@ fill_app_name_hash (void)
     get_app_id_from_name (keys[i]);
 }
 
-static gboolean
-app_can_see_doc (XdgAppDbEntry *entry, guint32 app_id)
-{
-  const char *app_name = get_app_name_from_id (app_id);
-
-  if (app_id == 0)
-    return TRUE;
-
-  if (app_name != NULL &&
-      xdp_entry_has_permissions (entry, app_name, XDP_PERMISSION_FLAGS_READ))
-    return TRUE;
-
-  return FALSE;
-}
-
-static gboolean
-app_can_write_doc (XdgAppDbEntry *entry, guint32 app_id)
-{
-  const char *app_name = get_app_name_from_id (app_id);
-
-  if (app_id == 0)
-    return TRUE;
-
-  if (app_name != NULL &&
-      xdp_entry_has_permissions (entry, app_name, XDP_PERMISSION_FLAGS_WRITE))
-    return TRUE;
-
-  return FALSE;
-}
-
 
 static int
 xdp_stat (fuse_ino_t ino,
@@ -751,7 +714,7 @@ xdp_stat (fuse_ino_t ino,
         stbuf->st_mode = S_IFREG | get_user_perms (&tmp_stbuf);
         if (!can_write)
           stbuf->st_mode &= ~(0222);
-        stbuf->st_size = tmp_stbuf.st_size;
+        stbuf->st_size = tmp_stbuf.st_size;d
         stbuf->st_uid = tmp_stbuf.st_uid;
         stbuf->st_gid = tmp_stbuf.st_gid;
         stbuf->st_blksize = tmp_stbuf.st_blksize;

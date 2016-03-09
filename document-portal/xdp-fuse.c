@@ -52,12 +52,10 @@ struct _XdpInode {
   char *app_id;
   char *doc_id;
 
-  /* Can change for tmp files */
-  char *filename;
-
   GList *children; /* lazily filled, protected by inodes lock */
+  char *filename; /* variable (for non-dirs), protected by inodes lock */
 
-  gint ref_count;
+  gint ref_count; /* atomic */
 };
 
 #define ROOT_INODE  1
@@ -287,6 +285,81 @@ xdp_inode_lookup_unlocked (fuse_ino_t inode_nr)
   return NULL;
 }
 
+static GList *
+xdp_inode_list_children (XdpInode *inode)
+{
+  GList *list = NULL, *l;
+
+  AUTOLOCK(inodes);
+  for (l = inode->children; l != NULL; l = l->next)
+    {
+      XdpInode *child = l->data;
+
+      list = g_list_prepend (list, child);
+    }
+
+  return g_list_reverse (list);
+}
+
+static XdpInode *
+xdp_inode_lookup_child_unlocked (XdpInode *inode, const char *filename)
+{
+  GList *l;
+
+  for (l = inode->children; l != NULL; l = l->next)
+    {
+      XdpInode *child = l->data;
+      if (strcmp (child->filename, filename) == 0)
+        return xdp_inode_ref (child);
+    }
+
+  return NULL;
+}
+
+static XdpInode *
+xdp_inode_lookup_child (XdpInode *inode, const char *filename)
+{
+  AUTOLOCK(inodes);
+  return xdp_inode_lookup_child_unlocked (inode, filename);
+}
+
+static gboolean
+xdp_inode_has_filename (XdpInode *inode, const char *filename)
+{
+  AUTOLOCK(inodes);
+  return strcmp (inode->filename, filename) == 0;
+}
+
+char *
+xdp_inode_get_filename (XdpInode *inode)
+{
+  AUTOLOCK(inodes);
+  return g_strdup (inode->filename);
+}
+
+static XdpInode *
+xdp_inode_ensure_document_file (XdpInode *dir,
+                                XdgAppDbEntry *entry)
+{
+  g_autofree char *basename = xdp_entry_dup_basename (entry);
+  XdpInode *inode;
+
+  g_assert (dir->type == XDP_INODE_APP_DOC_DIR || dir->type == XDP_INODE_DOC_DIR);
+
+  AUTOLOCK(inodes);
+
+  inode = xdp_inode_lookup_child_unlocked (dir, basename);
+  if (inode)
+    return inode;
+
+  return xdp_inode_new_unlocked (allocate_inode_unlocked (),
+                                 XDP_INODE_DOC_FILE,
+                                 dir,
+                                 basename,
+                                 dir->app_id,
+                                 dir->doc_id);
+}
+
 static XdpInode *
 xdp_inode_lookup (fuse_ino_t inode_nr)
 {
@@ -345,9 +418,27 @@ xdp_inode_get_dir (const char *app_id, const char *doc_id)
 }
 
 /********************************************************************** \
- * FUSE Implementation, all uses here should avoid the _unlocked
- * versions and handle concurrency wrt access to inodes lock
+ * FUSE Implementation
 \***********************************************************************/
+
+static int
+get_user_perms (const struct stat *stbuf)
+{
+  /* Strip out exec and setuid bits */
+  return stbuf->st_mode & 0666;
+}
+
+static gboolean
+app_can_write_doc (XdgAppDbEntry *entry, const char *app_id)
+{
+  if (app_id == NULL)
+    return TRUE;
+
+  if (xdp_entry_has_permissions (entry, app_id, XDP_PERMISSION_FLAGS_WRITE))
+    return TRUE;
+
+  return FALSE;
+}
 
 static gboolean
 app_can_see_doc (XdgAppDbEntry *entry, const char *app_id)
@@ -361,7 +452,7 @@ app_can_see_doc (XdgAppDbEntry *entry, const char *app_id)
   return FALSE;
 }
 
-static void
+static int
 xdp_inode_stat (XdpInode *inode,
                 struct stat *stbuf)
 {
@@ -383,9 +474,53 @@ xdp_inode_stat (XdpInode *inode,
       break;
 
     case XDP_INODE_DOC_FILE:
+      {
+        g_autoptr (XdgAppDbEntry) entry = NULL;
+        g_autofree char *basename = NULL;
+        struct stat tmp_stbuf;
+        gboolean can_write = FALSE;
+
+        entry = xdp_lookup_doc (inode->doc_id);
+        if (entry == NULL)
+          {
+            errno = ENOENT;
+            return -1;
+          }
+
+        basename = xdp_entry_dup_basename (entry);
+        if (xdp_inode_has_filename (inode, basename))
+          {
+            if (xdp_entry_stat (entry, &tmp_stbuf, AT_SYMLINK_NOFOLLOW) != 0)
+              return -1;
+
+            can_write = app_can_write_doc (entry, inode->app_id);
+          }
+        else
+          {
+            /* TODO: Handle tmp files */
+            errno = ENOENT;
+            return -1;
+          }
+
+        stbuf->st_mode = S_IFREG | get_user_perms (&tmp_stbuf);
+        if (!can_write)
+          stbuf->st_mode &= ~(0222);
+        stbuf->st_size = tmp_stbuf.st_size;
+        stbuf->st_uid = tmp_stbuf.st_uid;
+        stbuf->st_gid = tmp_stbuf.st_gid;
+        stbuf->st_blksize = tmp_stbuf.st_blksize;
+        stbuf->st_blocks = tmp_stbuf.st_blocks;
+        stbuf->st_atim = tmp_stbuf.st_atim;
+        stbuf->st_mtim = tmp_stbuf.st_mtim;
+        stbuf->st_ctim = tmp_stbuf.st_ctim;
+      }
+      break;
+
     default:
       g_assert_not_reached ();
     }
+
+  return 0;
 }
 
 static void
@@ -407,6 +542,10 @@ xdp_fuse_lookup (fuse_req_t req,
       fuse_reply_err (req, ENOENT);
       return;
     }
+
+  /* Default */
+  e.attr_timeout = ATTR_CACHE_TIME;
+  e.entry_timeout = ENTRY_CACHE_TIME;
 
   switch (parent_inode->type)
     {
@@ -436,9 +575,33 @@ xdp_fuse_lookup (fuse_req_t req,
 
     case XDP_INODE_APP_DOC_DIR:
     case XDP_INODE_DOC_DIR:
+      {
+        g_autoptr(XdpInode) doc_inode = NULL;
+        entry = xdp_lookup_doc (parent_inode->doc_id);
+        if (entry == NULL)
+          {
+            g_debug ("xdp_fuse_lookup <- error no parent entry ENOENT");
+            fuse_reply_err (req, ENOENT);
+            return;
+          }
+
+        /* Ensure it is alive at least during lookup_child () */
+        doc_inode = xdp_inode_ensure_document_file (parent_inode, entry);
+
+        child_inode = xdp_inode_lookup_child (parent_inode, name);
+
+        /* We verify in the stat below if the backing file exists */
+
+        /* Files can be changed from outside the fuse fs, so don't cache any data */
+        e.attr_timeout = 0;
+        e.entry_timeout = 0;
+      }
       break;
 
     case XDP_INODE_DOC_FILE:
+      fuse_reply_err (req, ENOTDIR);
+      return;
+
     default:
       break;
     }
@@ -450,10 +613,13 @@ xdp_fuse_lookup (fuse_req_t req,
       return;
     }
 
-  xdp_inode_stat (child_inode, &e.attr);
+  if (xdp_inode_stat (child_inode, &e.attr) != 0)
+    {
+      fuse_reply_err (req, errno);
+      return;
+    }
+
   e.ino = child_inode->ino;
-  e.attr_timeout = ATTR_CACHE_TIME;
-  e.entry_timeout = ENTRY_CACHE_TIME;
 
   g_debug ("xdp_fuse_lookup <- inode %lx", (long)e.ino);
   xdp_inode_ref (child_inode); /* Ref given to the kernel, returned in xdp_fuse_forget() */
@@ -530,43 +696,6 @@ dirbuf_add_docs (fuse_req_t req,
       dirbuf_add (req, b, docs[i], ino, S_IFDIR);
     }
 }
-
-#ifdef TODO
-static void
-dirbuf_add_doc_file (fuse_req_t req,
-                     struct dirbuf *b,
-                     XdgAppDbEntry *entry,
-                     guint32 doc_id,
-                     guint32 app_id)
-{
-  struct stat tmp_stbuf;
-  guint64 inode;
-  g_autofree char *basename = xdp_entry_dup_basename (entry);
-
-  inode = make_app_doc_file_inode (app_id, doc_id);
-
-  if (xdp_entry_stat (entry, &tmp_stbuf, AT_SYMLINK_NOFOLLOW) == 0)
-    dirbuf_add (req, b, basename, inode);
-}
-
-static void
-dirbuf_add_tmp_files (fuse_req_t req,
-                      struct dirbuf *b,
-                      guint64 dir_inode)
-{
-  GList *l;
-
-  AUTOLOCK(tmp_files);
-
-  for (l = tmp_files; l != NULL; l = l->next)
-    {
-      XdpTmp *tmp = l->data;
-      if (tmp->parent_inode == dir_inode)
-        dirbuf_add (req, b, tmp->name,
-                    make_inode (TMPFILE_INO_CLASS, tmp->tmp_id));
-    }
-}
-#endif
 
 static int
 reply_buf_limited (fuse_req_t req,
@@ -653,17 +782,39 @@ xdp_fuse_opendir (fuse_req_t req,
 
     case XDP_INODE_APP_DOC_DIR:
     case XDP_INODE_DOC_DIR:
-      dirbuf_add (req, &b, ".", inode->ino, S_IFDIR);
-      dirbuf_add (req, &b, "..", inode->parent->ino, S_IFDIR);
+      {
+        GList *children, *l;
+        g_autoptr(XdpInode) doc_inode = NULL;
+        g_autoptr (XdgAppDbEntry) entry = NULL;
 
-#ifdef TODO
-      dirbuf_add_doc_file (req, &b, entry,
-                           get_doc_id_from_app_doc_ino (class_ino),
-                           get_app_id_from_app_doc_ino (class_ino));
-      dirbuf_add_tmp_files (req, &b, ino);
-      break;
-#endif
+        entry = xdp_lookup_doc (inode->doc_id);
+        if (entry == NULL)
+          {
+            fuse_reply_err (req, ENOENT);
+            break;
+          }
 
+        dirbuf_add (req, &b, ".", inode->ino, S_IFDIR);
+        dirbuf_add (req, &b, "..", inode->parent->ino, S_IFDIR);
+
+        /* Ensure it is alive at least during list_children () */
+        doc_inode = xdp_inode_ensure_document_file (inode, entry);
+
+        children = xdp_inode_list_children (inode);
+
+        for (l = children; l != NULL; l = l->next)
+          {
+            struct stat stbuf;
+            XdpInode *child = l->data;
+            if (xdp_inode_stat (child, &stbuf) == 0)
+              {
+                g_autofree char *filename = xdp_inode_get_filename (child);
+                dirbuf_add (req, &b, filename, child->ino, stbuf.st_mode);
+              }
+            xdp_inode_unref (child);
+          }
+        g_list_free (children);
+      }
       break;
 
     default:
@@ -745,7 +896,12 @@ xdp_fuse_getattr (fuse_req_t req,
 
 #endif
 
-  xdp_inode_stat (inode, &stbuf);
+  if (xdp_inode_stat (inode,  &stbuf) != 0)
+    {
+      fuse_reply_err (req, errno);
+      return;
+    }
+
   fuse_reply_attr (req, &stbuf, ATTR_CACHE_TIME);
 }
 
