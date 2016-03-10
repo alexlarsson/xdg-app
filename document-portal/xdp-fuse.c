@@ -482,6 +482,23 @@ app_can_see_doc (XdgAppDbEntry *entry, const char *app_id)
 }
 
 static int
+xdp_inode_dupfd (XdpInode *inode)
+{
+  int fd = -1;
+
+  g_mutex_lock (&inode->mutex);
+
+  if (inode->dir_fd != -1)
+    {
+      fd = dup (inode->fd);
+    }
+
+  g_mutex_unlock (&inode->mutex);
+
+  return fd;
+}
+
+static int
 xdp_inode_stat (XdpInode *inode,
                 struct stat *stbuf)
 {
@@ -508,6 +525,7 @@ xdp_inode_stat (XdpInode *inode,
         g_autofree char *backing_filename = NULL;
         struct stat tmp_stbuf;
         gboolean can_see, can_write;
+        int fd;
 
         entry = xdp_lookup_doc (inode->doc_id);
         if (entry == NULL)
@@ -519,16 +537,36 @@ xdp_inode_stat (XdpInode *inode,
         can_see = app_can_see_doc (entry, inode->app_id);
         can_write = app_can_write_doc (entry, inode->app_id);
 
-        backing_filename = xdp_inode_get_backing_filename (inode);
-        if (!can_see ||
-            backing_filename == NULL)
+        if (!can_see)
           {
             errno = ENOENT;
             return -1;
           }
 
-        if (xdp_entry_stat (entry, backing_filename, &tmp_stbuf, AT_SYMLINK_NOFOLLOW) != 0)
-          return -1;
+        fd = xdp_inode_dupfd (inode);
+        if (fd != -1)
+          {
+            if (fstat (fd, &tmp_stbuf) != 0)
+              {
+                int errsv = errno;
+                close (fd);
+                errno = errsv;
+                return -1;
+              }
+            close (fd);
+          }
+        else
+          {
+            backing_filename = xdp_inode_get_backing_filename (inode);
+            if (backing_filename == NULL) /* removed */
+              {
+                errno = ENOENT;
+                return -1;
+              }
+
+            if (xdp_entry_stat (entry, backing_filename, &tmp_stbuf, AT_SYMLINK_NOFOLLOW) != 0)
+              return -1;
+          }
 
         stbuf->st_mode = S_IFREG | get_user_perms (&tmp_stbuf);
         if (!can_write)
@@ -874,6 +912,7 @@ xdp_fuse_releasedir (fuse_req_t req,
 }
 
 
+
 static void
 xdp_fuse_getattr (fuse_req_t req,
                   fuse_ino_t ino,
@@ -988,6 +1027,21 @@ xdp_file_free (XdpFile *file)
   XdpInode *inode = file->inode;
   g_mutex_lock (&inode->mutex);
   inode->open_files = g_list_remove (inode->open_files, file);
+
+  if (inode->open_files == NULL)
+    {
+      if (inode->dir_fd != -1)
+        {
+          close (inode->dir_fd);
+          inode->dir_fd = -1;
+        }
+      if (inode->fd != -1)
+        {
+          close (inode->fd);
+          inode->fd = -1;
+        }
+    }
+
   g_mutex_unlock (&inode->mutex);
   xdp_inode_unref (inode);
   g_free (file);
@@ -1095,6 +1149,46 @@ xdp_fuse_open (fuse_req_t req,
     xdp_file_free (file);
 }
 
+static void
+xdp_fuse_read (fuse_req_t req,
+               fuse_ino_t ino,
+               size_t size,
+               off_t off,
+               struct fuse_file_info *fi)
+{
+  XdpFile *file = (gpointer)fi->fh;
+  XdpInode *inode = file->inode;
+  struct fuse_bufvec bufv = FUSE_BUFVEC_INIT (size);
+  glnx_fd_close int fd = -1;
+
+  fd = xdp_inode_dupfd (inode);
+
+  if (fd == -1)
+    {
+      fuse_reply_err (req, ENOENT);
+      return;
+    }
+
+  bufv.buf[0].flags = FUSE_BUF_IS_FD | FUSE_BUF_FD_SEEK;
+  bufv.buf[0].fd = fd;
+  bufv.buf[0].pos = off;
+
+  fuse_reply_data (req, &bufv, FUSE_BUF_SPLICE_MOVE);
+}
+
+static  void
+xdp_fuse_release (fuse_req_t req,
+                  fuse_ino_t ino,
+                  struct fuse_file_info *fi)
+{
+  XdpFile *file = (gpointer)fi->fh;
+
+  g_debug ("xdp_fuse_release %lx (fi=%p)", ino, fi);
+
+  xdp_file_free (file);
+  fuse_reply_err (req, 0);
+}
+
 static struct fuse_lowlevel_ops xdp_fuse_oper = {
   .lookup       = xdp_fuse_lookup,
   .forget       = xdp_fuse_forget,
@@ -1104,12 +1198,12 @@ static struct fuse_lowlevel_ops xdp_fuse_oper = {
   .releasedir   = xdp_fuse_releasedir,
   .fsyncdir     = xdp_fuse_fsyncdir,
   .open         = xdp_fuse_open,
+  .read         = xdp_fuse_read,
+  .release      = xdp_fuse_release,
   /*
   .create       = xdp_fuse_create,
-  .read         = xdp_fuse_read,
   .write        = xdp_fuse_write,
   .write_buf    = xdp_fuse_write_buf,
-  .release      = xdp_fuse_release,
   .rename       = xdp_fuse_rename,
   .setattr      = xdp_fuse_setattr,
   .fsync        = xdp_fuse_fsync,
