@@ -26,6 +26,7 @@ guint64            xdp_entry_get_inode       (XdgAppDbEntry      *entry);
 guint32            xdp_entry_get_flags       (XdgAppDbEntry      *entry);
 int                xdp_entry_open_dir        (XdgAppDbEntry      *entry);
 int                xdp_entry_stat            (XdgAppDbEntry      *entry,
+                                              const char         *filename,
                                               struct stat        *buf,
                                               int                 flags);
 

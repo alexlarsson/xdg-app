@@ -165,17 +165,17 @@ xdp_entry_open_dir (XdgAppDbEntry *entry)
 
 int
 xdp_entry_stat (XdgAppDbEntry *entry,
+                const char *filename,
                 struct stat *buf,
                 int flags)
 {
   glnx_fd_close int fd = -1;
-  g_autofree char *basename = xdp_entry_dup_basename (entry);
 
   fd = xdp_entry_open_dir (entry);
   if (fd < 0)
     return -1;
 
-  if (fstatat (fd, basename, buf, flags) != 0)
+  if (fstatat (fd, filename, buf, flags) != 0)
     return -1;
 
   return 0;

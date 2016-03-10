@@ -490,7 +490,7 @@ xdp_inode_stat (XdpInode *inode,
         basename = xdp_entry_dup_basename (entry);
         if (xdp_inode_has_filename (inode, basename))
           {
-            if (xdp_entry_stat (entry, &tmp_stbuf, AT_SYMLINK_NOFOLLOW) != 0)
+            if (xdp_entry_stat (entry, basename, &tmp_stbuf, AT_SYMLINK_NOFOLLOW) != 0)
               return -1;
 
             can_write = app_can_write_doc (entry, inode->app_id);
