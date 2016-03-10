@@ -478,10 +478,27 @@ app_can_see_doc (XdgAppDbEntry *entry, const char *app_id)
 
 /* Call with mutex held! */
 static int
-xdp_inode_getfd (XdpInode *inode)
+xdp_inode_get_fd (XdpInode *inode)
 {
   if (inode->truncated)
     return inode->trunc_fd;
+
+  return inode->fd;
+}
+
+/* Call with mutex held! */
+static int
+xdp_inode_get_write_fd (XdpInode *inode)
+{
+  if (inode->is_doc)
+    {
+      if (!inode->truncated)
+        {
+          errno = ENOSYS;
+          return -1;
+        }
+      return inode->trunc_fd;
+    }
 
   return inode->fd;
 }
@@ -534,7 +551,7 @@ xdp_inode_stat (XdpInode *inode,
 
         g_mutex_lock (&inode->mutex);
 
-        fd = xdp_inode_getfd (inode);
+        fd = xdp_inode_get_fd (inode);
         if (fd != -1)
           res = fstat (fd, &tmp_stbuf);
         else
@@ -1009,15 +1026,36 @@ xdp_file_free (XdpFile *file)
 
   if (inode->open_files == NULL)
     {
-      if (inode->dir_fd != -1)
+      if (inode->truncated)
         {
-          close (inode->dir_fd);
-          inode->dir_fd = -1;
+          fsync (inode->trunc_fd);
+          g_free (inode->backing_filename);
+          inode->backing_filename = g_strdup (inode->filename);
+          if (renameat (inode->dir_fd, inode->trunc_filename,
+                        inode->dir_fd, inode->backing_filename) != 0)
+            g_warning ("Unable to replace truncated document: %s", strerror (errno));
         }
+      else if (inode->trunc_filename != NULL)
+        unlinkat (inode->dir_fd, inode->trunc_filename, 0);
+
+      if (inode->trunc_fd != -1)
+        {
+          close (inode->trunc_fd);
+          inode->trunc_fd = -1;
+          g_free (inode->trunc_filename);
+          inode->trunc_filename = NULL;
+        }
+
       if (inode->fd != -1)
         {
           close (inode->fd);
           inode->fd = -1;
+        }
+
+      if (inode->dir_fd != -1)
+        {
+          close (inode->dir_fd);
+          inode->dir_fd = -1;
         }
     }
 
@@ -1074,7 +1112,8 @@ xdp_fuse_open (fuse_req_t req,
     }
 
   entry = xdp_lookup_doc (inode->doc_id);
-  if (entry == NULL || !app_can_see_doc (entry, inode->app_id))
+  if (entry == NULL ||
+      !app_can_see_doc (entry, inode->app_id))
     {
       g_debug ("xdp_fuse_open <- no entry error ENOENT");
       fuse_reply_err (req, ENOENT);
@@ -1191,7 +1230,7 @@ xdp_fuse_read (fuse_req_t req,
 
   g_mutex_lock (&inode->mutex);
 
-  fd = xdp_inode_getfd (inode);
+  fd = xdp_inode_get_fd (inode);
   if (fd == -1)
     {
       static char c = 'x';
@@ -1226,6 +1265,188 @@ xdp_fuse_release (fuse_req_t req,
   fuse_reply_err (req, 0);
 }
 
+static int
+truncateat (int dir_fd, const char *filename, int size)
+{
+  int fd;
+  int errsv, res;
+
+  fd = openat (dir_fd, filename, O_RDWR);
+  if (fd != -1)
+    return -1;
+
+  res = ftruncate (fd, size);
+  errsv = errno;
+
+  close (fd);
+
+  errno = errsv;
+  return res;
+}
+
+static void
+xdp_fuse_setattr (fuse_req_t req,
+                  fuse_ino_t ino,
+                  struct stat *attr,
+                  int to_set,
+                  struct fuse_file_info *fi)
+{
+  g_autoptr(XdpInode) inode = NULL;
+  g_autoptr(XdgAppDbEntry) entry = NULL;
+  double attr_cache_time = ATTR_CACHE_TIME;
+  struct stat newattr = {0};
+  gboolean can_write;
+  int res = 0;
+
+  g_debug ("xdp_fuse_setattr %lx %x %p", ino, to_set, fi);
+
+  inode = xdp_inode_lookup (ino);
+  if (inode == NULL)
+    {
+      g_debug ("xdp_fuse_setattr <- error ENOENT");
+      fuse_reply_err (req, ENOENT);
+      return;
+    }
+
+  entry = xdp_lookup_doc (inode->doc_id);
+  if (entry == NULL ||
+      !app_can_see_doc (entry, inode->app_id))
+    {
+      g_debug ("xdp_fuse_setattr <- no entry error ENOENT");
+      fuse_reply_err (req, ENOENT);
+      return;
+    }
+
+  can_write = app_can_write_doc (entry, inode->app_id);
+
+  if (to_set == FUSE_SET_ATTR_SIZE)
+    {
+      g_mutex_lock (&inode->mutex);
+
+      if (!can_write)
+        res = EACCES;
+      else if (inode->is_doc)
+        {
+          /* Only allow ftruncate with the file open for write. We could
+           * allow a truncate, but it would have to be implemented as
+           * an atomic-replace-with-empty-file to not affect other apps
+           * having the file open.
+           * Also, only support truncate-to-zero on first truncation, to
+           * avoid having to copy lots of data from the old file to the
+           * trunc_fd.
+           */
+          if (inode->trunc_fd == -1)
+            res = EACCES;
+          else if (!inode->truncated && attr->st_size != 0)
+            res = ENOSYS;
+          else
+            {
+              if (ftruncate (inode->trunc_fd, attr->st_size) != 0)
+                res = errno;
+              else if (!inode->truncated)
+                {
+                  inode->truncated = TRUE;
+                  g_free (inode->backing_filename);
+                  inode->backing_filename = g_strdup (inode->trunc_filename);
+                }
+            }
+        }
+      else
+        {
+          if (inode->fd)
+            {
+              if (ftruncate (inode->fd, attr->st_size) != 0)
+                res = errno;
+            }
+          else
+            {
+              glnx_fd_close int dir_fd = xdp_entry_open_dir (entry);
+              if (dir_fd == -1 ||
+                  truncateat (dir_fd, inode->backing_filename, attr->st_size) != 0)
+                res = errno;
+            }
+        }
+      g_mutex_unlock (&inode->mutex);
+    }
+  else
+    res = ENOSYS;
+
+  if (res != 0)
+    fuse_reply_err (req, ENOSYS);
+  else
+    {
+      if (xdp_inode_stat (inode, &newattr) != 0)
+        fuse_reply_err (req, errno);
+      else
+        fuse_reply_attr (req, &newattr, attr_cache_time);
+    }
+}
+
+static  void
+xdp_fuse_write (fuse_req_t req,
+                fuse_ino_t ino,
+                const char *buf,
+                size_t size,
+                off_t off,
+                struct fuse_file_info *fi)
+{
+  XdpFile *file = (gpointer)fi->fh;
+  XdpInode *inode = file->inode;
+  int fd;
+  int res;
+
+  g_mutex_lock (&inode->mutex);
+
+  fd = xdp_inode_get_write_fd (inode);
+  if (fd < 0)
+    fuse_reply_err (req, errno);
+  else
+    {
+      res = pwrite (fd, buf, size, off);
+      if (res < 0)
+        fuse_reply_err (req, errno);
+      else
+        fuse_reply_write (req, res);
+    }
+
+  g_mutex_unlock (&inode->mutex);
+}
+
+static void
+xdp_fuse_write_buf (fuse_req_t req,
+                    fuse_ino_t ino,
+                    struct fuse_bufvec *bufv,
+                    off_t off,
+                    struct fuse_file_info *fi)
+{
+  XdpFile *file = (gpointer)fi->fh;
+  struct fuse_bufvec dst = FUSE_BUFVEC_INIT(fuse_buf_size(bufv));
+  XdpInode *inode = file->inode;
+  int fd;
+  int res;
+
+  g_mutex_lock (&inode->mutex);
+
+  fd = xdp_inode_get_write_fd (inode);
+  if (fd == -1)
+    fuse_reply_err (req, errno);
+  else
+    {
+      dst.buf[0].flags = FUSE_BUF_IS_FD | FUSE_BUF_FD_SEEK;
+      dst.buf[0].fd = fd;
+      dst.buf[0].pos = off;
+
+      res = fuse_buf_copy (&dst, bufv, FUSE_BUF_SPLICE_NONBLOCK);
+      if (res < 0)
+        fuse_reply_err (req, -res);
+      else
+        fuse_reply_write (req, res);
+    }
+
+  g_mutex_unlock (&inode->mutex);
+
+}
+
 static struct fuse_lowlevel_ops xdp_fuse_oper = {
   .lookup       = xdp_fuse_lookup,
   .forget       = xdp_fuse_forget,
@@ -1237,12 +1458,12 @@ static struct fuse_lowlevel_ops xdp_fuse_oper = {
   .open         = xdp_fuse_open,
   .read         = xdp_fuse_read,
   .release      = xdp_fuse_release,
-  /*
-  .create       = xdp_fuse_create,
+  .setattr      = xdp_fuse_setattr,
   .write        = xdp_fuse_write,
   .write_buf    = xdp_fuse_write_buf,
+  /*
+  .create       = xdp_fuse_create,
   .rename       = xdp_fuse_rename,
-  .setattr      = xdp_fuse_setattr,
   .fsync        = xdp_fuse_fsync,
   .unlink       = xdp_fuse_unlink,
   */
