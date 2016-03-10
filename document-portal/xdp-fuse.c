@@ -1444,8 +1444,40 @@ xdp_fuse_write_buf (fuse_req_t req,
     }
 
   g_mutex_unlock (&inode->mutex);
-
 }
+
+static void
+xdp_fuse_fsync (fuse_req_t req,
+                fuse_ino_t ino,
+                int datasync,
+                struct fuse_file_info *fi)
+{
+  g_autoptr(XdpInode) inode = NULL;
+  int fd;
+  int res = 0;
+
+  inode = xdp_inode_lookup (ino);
+  if (inode == NULL)
+    {
+      g_debug ("xdp_fuse_setattr <- error ENOENT");
+      fuse_reply_err (req, ENOENT);
+      return;
+    }
+
+  if (inode->type == XDP_INODE_DOC_FILE)
+    {
+      g_mutex_lock (&inode->mutex);
+
+      fd = xdp_inode_get_write_fd (inode);
+      if (fd != -1 && fsync (fd) != 0)
+        res = errno;
+
+      g_mutex_unlock (&inode->mutex);
+    }
+
+  fuse_reply_err (req, res);
+}
+
 
 static struct fuse_lowlevel_ops xdp_fuse_oper = {
   .lookup       = xdp_fuse_lookup,
@@ -1461,10 +1493,10 @@ static struct fuse_lowlevel_ops xdp_fuse_oper = {
   .setattr      = xdp_fuse_setattr,
   .write        = xdp_fuse_write,
   .write_buf    = xdp_fuse_write_buf,
+  .fsync        = xdp_fuse_fsync,
   /*
   .create       = xdp_fuse_create,
   .rename       = xdp_fuse_rename,
-  .fsync        = xdp_fuse_fsync,
   .unlink       = xdp_fuse_unlink,
   */
 };
