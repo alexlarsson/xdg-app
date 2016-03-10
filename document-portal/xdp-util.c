@@ -169,14 +169,22 @@ xdp_entry_stat (XdgAppDbEntry *entry,
                 struct stat *buf,
                 int flags)
 {
-  glnx_fd_close int fd = -1;
+  int fd;
+  int errsv;
 
   fd = xdp_entry_open_dir (entry);
   if (fd < 0)
     return -1;
 
   if (fstatat (fd, filename, buf, flags) != 0)
-    return -1;
+    {
+      errsv = errno;
+      close (fd);
+      errno = errsv;
+      return -1;
+    }
+
+  close (fd);
 
   return 0;
 }
