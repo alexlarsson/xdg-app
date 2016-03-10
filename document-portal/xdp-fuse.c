@@ -24,8 +24,8 @@
 #define DOC_DIR_PERMS 0700
 
 /* TODO: What do we put here */
-#define ATTR_CACHE_TIME 1.0
-#define ENTRY_CACHE_TIME 1.0
+#define ATTR_CACHE_TIME 60.0
+#define ENTRY_CACHE_TIME 60.0
 
 /* We pretend that the file is hardlinked. This causes most apps to do
    a truncating overwrite, which suits us better, as we do the atomic
