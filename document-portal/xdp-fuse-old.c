@@ -27,13 +27,6 @@ static guint32 next_app_id = 1;
 G_LOCK_DEFINE(app_id);
 
 #ifdef TODO
-static int
-steal_fd (int *fdp)
-{
-  int fd = *fdp;
-  *fdp = -1;
-  return fd;
-}
 
 static double
 get_attr_cache_time (int st_mode)
