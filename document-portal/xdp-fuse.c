@@ -29,8 +29,7 @@
 
 /* We pretend that the file is hardlinked. This causes most apps to do
    a truncating overwrite, which suits us better, as we do the atomic
-   rename ourselves anyway. This way we don't weirdly change the inode
-   after the rename. */
+   rename ourselves anyway. */
 #define DOC_FILE_NLINK 2
 
 typedef enum {
