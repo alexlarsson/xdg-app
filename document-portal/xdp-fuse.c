@@ -54,6 +54,7 @@ struct _XdpInode {
 
   GList *children; /* lazily filled, protected by inodes lock */
   char *filename; /* variable (for non-dirs), protected by inodes lock */
+  char *backing_filename; /* variable, nullable, protected by inodes lock */
 
   gint ref_count; /* atomic */
 };
@@ -172,6 +173,7 @@ xdp_inode_destroy (XdpInode *inode, gboolean locked)
 {
   g_assert (inode->children == NULL);
   xdp_inode_unref_internal (inode->parent, locked);
+  g_free (inode->backing_filename);
   g_free (inode->filename);
   g_free (inode->app_id);
   g_free (inode->doc_id);
@@ -337,6 +339,13 @@ xdp_inode_get_filename (XdpInode *inode)
   return g_strdup (inode->filename);
 }
 
+char *
+xdp_inode_get_backing_filename (XdpInode *inode)
+{
+  AUTOLOCK(inodes);
+  return g_strdup (inode->backing_filename);
+}
+
 static XdpInode *
 xdp_inode_ensure_document_file (XdpInode *dir,
                                 XdgAppDbEntry *entry)
@@ -349,15 +358,18 @@ xdp_inode_ensure_document_file (XdpInode *dir,
   AUTOLOCK(inodes);
 
   inode = xdp_inode_lookup_child_unlocked (dir, basename);
-  if (inode)
-    return inode;
+  if (inode == NULL)
+    {
+      inode = xdp_inode_new_unlocked (allocate_inode_unlocked (),
+                                      XDP_INODE_DOC_FILE,
+                                      dir,
+                                      basename,
+                                      dir->app_id,
+                                      dir->doc_id);
+      inode->backing_filename = g_steal_pointer (&basename);
+    }
 
-  return xdp_inode_new_unlocked (allocate_inode_unlocked (),
-                                 XDP_INODE_DOC_FILE,
-                                 dir,
-                                 basename,
-                                 dir->app_id,
-                                 dir->doc_id);
+  return inode;
 }
 
 static XdpInode *
@@ -476,7 +488,7 @@ xdp_inode_stat (XdpInode *inode,
     case XDP_INODE_DOC_FILE:
       {
         g_autoptr (XdgAppDbEntry) entry = NULL;
-        g_autofree char *basename = NULL;
+        g_autofree char *backing_filename = NULL;
         struct stat tmp_stbuf;
         gboolean can_write = FALSE;
 
@@ -487,20 +499,11 @@ xdp_inode_stat (XdpInode *inode,
             return -1;
           }
 
-        basename = xdp_entry_dup_basename (entry);
-        if (xdp_inode_has_filename (inode, basename))
-          {
-            if (xdp_entry_stat (entry, basename, &tmp_stbuf, AT_SYMLINK_NOFOLLOW) != 0)
-              return -1;
+        can_write = app_can_write_doc (entry, inode->app_id);
 
-            can_write = app_can_write_doc (entry, inode->app_id);
-          }
-        else
-          {
-            /* TODO: Handle tmp files */
-            errno = ENOENT;
-            return -1;
-          }
+        backing_filename = xdp_inode_get_backing_filename (inode);
+        if (xdp_entry_stat (entry, backing_filename, &tmp_stbuf, AT_SYMLINK_NOFOLLOW) != 0)
+          return -1;
 
         stbuf->st_mode = S_IFREG | get_user_perms (&tmp_stbuf);
         if (!can_write)
