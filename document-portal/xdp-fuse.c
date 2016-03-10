@@ -57,17 +57,21 @@ struct _XdpInode {
   /* mutable data */
 
   GList *children; /* lazily filled, protected by inodes lock */
-  char *filename; /* variable (for non-dirs), protected by inodes lock */
-  char *backing_filename; /* variable, nullable, protected by inodes lock, null if deleted */
+  char *filename; /* variable (for non-dirs), protected by inodes lock,
+                     null if deleted */
+  gboolean is_doc; /* True if this is the document file for this dir */
 
   /* Used when the file is open, protected by mutex */
-  GMutex mutex; /* Don't lock while holding inodes lock, as mutex can be hold during long i/o */
+  GMutex mutex; /* Don't lock while holding inodes lock,
+                   as mutex can be hold during long i/o */
   GList *open_files;
   int dir_fd;
-  int fd;
+  int fd; /* RW fd for tempfiles, RO fd for doc files */
+  char *backing_filename;
+  char *trunc_filename;
   int trunc_fd;
-#ifdef TODO
   gboolean truncated;
+#ifdef TODO
   gboolean readonly; /* TODO: set to true on source tmpfile renamed to final dest. Needs rethinking */
 #endif
 };
@@ -97,14 +101,6 @@ static struct fuse_session *session = NULL;
 static struct fuse_chan *main_ch = NULL;
 static char *mount_path = NULL;
 static pthread_t fuse_pthread = 0;
-
-static int
-steal_fd (int *fdp)
-{
-  int fd = *fdp;
-  *fdp = -1;
-  return fd;
-}
 
 /* Call with inodes lock held */
 static fuse_ino_t
@@ -192,6 +188,10 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(XdpInode, xdp_inode_unref)
 static void
 xdp_inode_destroy (XdpInode *inode, gboolean locked)
 {
+  g_assert (inode->dir_fd == -1);
+  g_assert (inode->fd == -1);
+  g_assert (inode->trunc_fd == -1);
+  g_assert (inode->trunc_filename == NULL);
   g_assert (inode->children == NULL);
   xdp_inode_unref_internal (inode->parent, locked);
   g_free (inode->backing_filename);
@@ -349,18 +349,12 @@ xdp_inode_lookup_child (XdpInode *inode, const char *filename)
   return xdp_inode_lookup_child_unlocked (inode, filename);
 }
 
+/* NULL if removed */
 char *
 xdp_inode_get_filename (XdpInode *inode)
 {
   AUTOLOCK(inodes);
   return g_strdup (inode->filename);
-}
-
-char *
-xdp_inode_get_backing_filename (XdpInode *inode)
-{
-  AUTOLOCK(inodes);
-  return g_strdup (inode->backing_filename);
 }
 
 static XdpInode *
@@ -384,6 +378,7 @@ xdp_inode_ensure_document_file (XdpInode *dir,
                                       dir->app_id,
                                       dir->doc_id);
       inode->backing_filename = g_steal_pointer (&basename);
+      inode->is_doc = TRUE;
     }
 
   return inode;
@@ -481,21 +476,14 @@ app_can_see_doc (XdgAppDbEntry *entry, const char *app_id)
   return FALSE;
 }
 
+/* Call with mutex held! */
 static int
-xdp_inode_dupfd (XdpInode *inode)
+xdp_inode_getfd (XdpInode *inode)
 {
-  int fd = -1;
+  if (inode->truncated)
+    return inode->trunc_fd;
 
-  g_mutex_lock (&inode->mutex);
-
-  if (inode->dir_fd != -1)
-    {
-      fd = dup (inode->fd);
-    }
-
-  g_mutex_unlock (&inode->mutex);
-
-  return fd;
+  return inode->fd;
 }
 
 static int
@@ -522,13 +510,14 @@ xdp_inode_stat (XdpInode *inode,
     case XDP_INODE_DOC_FILE:
       {
         g_autoptr (XdgAppDbEntry) entry = NULL;
-        g_autofree char *backing_filename = NULL;
         struct stat tmp_stbuf;
         gboolean can_see, can_write;
-        int fd;
+        g_autofree char *filename = NULL;
+        int fd, res, errsv;
 
+        filename = xdp_inode_get_filename (inode);
         entry = xdp_lookup_doc (inode->doc_id);
-        if (entry == NULL)
+        if (entry == NULL || filename == NULL)
           {
             errno = ENOENT;
             return -1;
@@ -543,29 +532,22 @@ xdp_inode_stat (XdpInode *inode,
             return -1;
           }
 
-        fd = xdp_inode_dupfd (inode);
-        if (fd != -1)
-          {
-            if (fstat (fd, &tmp_stbuf) != 0)
-              {
-                int errsv = errno;
-                close (fd);
-                errno = errsv;
-                return -1;
-              }
-            close (fd);
-          }
-        else
-          {
-            backing_filename = xdp_inode_get_backing_filename (inode);
-            if (backing_filename == NULL) /* removed */
-              {
-                errno = ENOENT;
-                return -1;
-              }
+        g_mutex_lock (&inode->mutex);
 
-            if (xdp_entry_stat (entry, backing_filename, &tmp_stbuf, AT_SYMLINK_NOFOLLOW) != 0)
-              return -1;
+        fd = xdp_inode_getfd (inode);
+        if (fd != -1)
+          res = fstat (fd, &tmp_stbuf);
+        else
+          res = xdp_entry_stat (entry, inode->backing_filename,
+                                &tmp_stbuf, AT_SYMLINK_NOFOLLOW);
+        errsv = errno;
+
+        g_mutex_unlock (&inode->mutex);
+
+        if (res != 0)
+          {
+            errno = errsv;
+            return -1;
           }
 
         stbuf->st_mode = S_IFREG | get_user_perms (&tmp_stbuf);
@@ -872,11 +854,9 @@ xdp_fuse_opendir (fuse_req_t req,
           {
             struct stat stbuf;
             XdpInode *child = l->data;
-            if (xdp_inode_stat (child, &stbuf) == 0)
-              {
-                g_autofree char *filename = xdp_inode_get_filename (child);
-                dirbuf_add (req, &b, filename, child->ino, stbuf.st_mode);
-              }
+            g_autofree char *filename = xdp_inode_get_filename (child);
+            if (filename != NULL && xdp_inode_stat (child, &stbuf) == 0)
+              dirbuf_add (req, &b, filename, child->ino, stbuf.st_mode);
             xdp_inode_unref (child);
           }
         g_list_free (children);
@@ -934,7 +914,6 @@ xdp_fuse_getattr (fuse_req_t req,
 #ifdef TODO
   g_autoptr(XdpFh) fh = NULL;
   int res;
-
 
   /* Fuse passes fi in to verify EOF during read/write/seek, but not during fstat */
   if (fi != NULL)
@@ -1047,6 +1026,21 @@ xdp_file_free (XdpFile *file)
   g_free (file);
 }
 
+static char *
+create_tmp_for_doc (XdgAppDbEntry *entry, int dir_fd, int flags, int *fd_out)
+{
+  g_autofree char *basename = xdp_entry_dup_basename (entry);
+  g_autofree char *template = g_strconcat (".xdp_", basename, ".XXXXXX", NULL);
+  int fd;
+
+  fd = xdg_app_mkstempat (dir_fd, template, flags|O_CLOEXEC, 0600);
+  if (fd == -1)
+    return NULL;
+
+  *fd_out = fd;
+  return g_steal_pointer (&template);
+}
+
 static void
 xdp_fuse_open (fuse_req_t req,
                fuse_ino_t ino,
@@ -1056,7 +1050,11 @@ xdp_fuse_open (fuse_req_t req,
   g_autoptr(XdgAppDbEntry) entry = NULL;
   gboolean can_write;
   int open_mode;
-  XdpFile *file;
+  XdpFile *file = NULL;
+  gboolean opened_dir_fd = FALSE;
+  gboolean opened_fd = FALSE;
+  gboolean opened_trunc_fd = FALSE;
+  int errsv;
 
   g_debug ("xdp_fuse_open %lx", ino);
 
@@ -1096,57 +1094,87 @@ xdp_fuse_open (fuse_req_t req,
 
   g_mutex_lock (&inode->mutex);
 
-  if (inode->dir_fd == -1)
+  do
     {
-      glnx_fd_close int dir_fd = -1;
-      glnx_fd_close int fd = -1;
-
-      if (inode->backing_filename == NULL)
+      /* Ensure all fds are open */
+      if (inode->dir_fd == -1)
         {
-          g_mutex_unlock (&inode->mutex);
-          fuse_reply_err (req, ENOENT);
-          return;
-        }
-
-      dir_fd = xdp_entry_open_dir (entry);
-      if (dir_fd == -1)
-        {
-          g_mutex_unlock (&inode->mutex);
-          fuse_reply_err (req, errno);
-          return;
+          inode->dir_fd = xdp_entry_open_dir (entry);
+          if (inode->dir_fd == -1)
+            break;
+          opened_dir_fd = TRUE;
         }
 
       if (open_mode != O_RDONLY)
         {
-          if (faccessat (dir_fd, inode->backing_filename, W_OK, 0) != 0)
-            {
-              g_mutex_unlock (&inode->mutex);
-              fuse_reply_err (req, errno);
-              return;
-            }
-          /* TODO: Create tmp fd */
+          if (faccessat (inode->dir_fd, inode->backing_filename, W_OK, 0) != 0)
+            break;
         }
 
-      fd = openat (dir_fd, inode->backing_filename, O_RDONLY|O_NOFOLLOW|O_CLOEXEC);
-      if (fd < 0)
+      if (inode->fd == -1)
         {
-          g_mutex_unlock (&inode->mutex);
-          fuse_reply_err (req, errno);
-          return;
+          int mode = O_NOFOLLOW|O_CLOEXEC;
+
+          if (inode->is_doc)
+            mode |= O_RDONLY;
+          else
+            mode |= O_RDWR;
+
+          inode->fd = openat (inode->dir_fd, inode->backing_filename, mode);
+          if (inode->fd < 0)
+            break;
+          opened_fd = TRUE;
         }
 
-      inode->dir_fd = steal_fd (&dir_fd);
-      inode->fd = steal_fd (&fd);
-    }
+      if (inode->is_doc && open_mode != O_RDONLY && inode->trunc_fd == -1)
+        {
+          g_assert (inode->trunc_filename == NULL);
+          inode->trunc_filename = create_tmp_for_doc (entry, inode->dir_fd, O_RDWR,
+                                                      &inode->trunc_fd);
+          if (inode->trunc_filename == NULL)
+            break;
 
-  file = xdp_file_new (inode, open_mode);
-  inode->open_files = g_list_prepend (inode->open_files, file);
+          opened_trunc_fd = TRUE;
+        }
+
+      file = xdp_file_new (inode, open_mode);
+      inode->open_files = g_list_prepend (inode->open_files, file);
+    }
+  while FALSE;
+
+  errsv = errno;
+
+  if (file == NULL)
+    {
+      if (opened_trunc_fd)
+        {
+          close (inode->trunc_fd);
+          inode->trunc_fd = -1;
+          g_free (inode->trunc_filename);
+          inode->trunc_filename = NULL;
+        }
+      if (opened_fd)
+        {
+          close (inode->fd);
+          inode->fd = -1;
+        }
+      if (opened_dir_fd)
+        {
+          close (inode->dir_fd);
+          inode->dir_fd = -1;
+        }
+    }
 
   g_mutex_unlock (&inode->mutex);
 
-  fi->fh = (gsize)file;
-  if (fuse_reply_open (req, fi))
-    xdp_file_free (file);
+  if (file != NULL)
+    {
+      fi->fh = (gsize)file;
+      if (fuse_reply_open (req, fi))
+        xdp_file_free (file);
+    }
+  else
+    fuse_reply_err (req, errsv);
 }
 
 static void
@@ -1159,21 +1187,30 @@ xdp_fuse_read (fuse_req_t req,
   XdpFile *file = (gpointer)fi->fh;
   XdpInode *inode = file->inode;
   struct fuse_bufvec bufv = FUSE_BUFVEC_INIT (size);
-  glnx_fd_close int fd = -1;
+  int fd;
 
-  fd = xdp_inode_dupfd (inode);
+  g_mutex_lock (&inode->mutex);
 
+  fd = xdp_inode_getfd (inode);
   if (fd == -1)
     {
-      fuse_reply_err (req, ENOENT);
-      return;
+      static char c = 'x';
+      bufv.buf[0].flags = 0;
+      bufv.buf[0].mem = &c;
+      bufv.buf[0].size = 0;
+
+      fuse_reply_data (req, &bufv, FUSE_BUF_NO_SPLICE);
+    }
+  else
+    {
+      bufv.buf[0].flags = FUSE_BUF_IS_FD | FUSE_BUF_FD_SEEK;
+      bufv.buf[0].fd = fd;
+      bufv.buf[0].pos = off;
+
+      fuse_reply_data (req, &bufv, FUSE_BUF_SPLICE_MOVE);
     }
 
-  bufv.buf[0].flags = FUSE_BUF_IS_FD | FUSE_BUF_FD_SEEK;
-  bufv.buf[0].fd = fd;
-  bufv.buf[0].pos = off;
-
-  fuse_reply_data (req, &bufv, FUSE_BUF_SPLICE_MOVE);
+  g_mutex_unlock (&inode->mutex);
 }
 
 static  void
