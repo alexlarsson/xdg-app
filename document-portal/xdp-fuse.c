@@ -908,6 +908,44 @@ xdp_fuse_getattr (fuse_req_t req,
   fuse_reply_attr (req, &stbuf, ATTR_CACHE_TIME);
 }
 
+static void
+xdp_fuse_fsyncdir (fuse_req_t req,
+                   fuse_ino_t ino,
+                   int datasync,
+                   struct fuse_file_info *fi)
+{
+  g_autoptr(XdpInode) inode = NULL;
+
+  inode = xdp_inode_lookup (ino);
+  if (inode == NULL)
+    {
+      g_debug ("xdp_fuse_fsyncdir <- error ENOENT");
+      fuse_reply_err (req, ENOENT);
+      return;
+    }
+
+  if (inode->type == XDP_INODE_APP_DOC_DIR ||
+      inode->type == XDP_INODE_DOC_DIR)
+    {
+      g_autoptr (XdgAppDbEntry) entry =  xdp_lookup_doc (inode->doc_id);
+      if (entry != NULL)
+        {
+          g_autofree char *dirname = xdp_entry_dup_dirname (entry);
+          int fd = open (dirname, O_DIRECTORY|O_RDONLY);
+          if (fd >= 0)
+            {
+              if (datasync)
+                fdatasync (fd);
+              else
+                fsync (fd);
+              close (fd);
+            }
+        }
+    }
+
+  fuse_reply_err (req, 0);
+}
+
 
 static struct fuse_lowlevel_ops xdp_fuse_oper = {
   .lookup       = xdp_fuse_lookup,
@@ -916,8 +954,8 @@ static struct fuse_lowlevel_ops xdp_fuse_oper = {
   .opendir      = xdp_fuse_opendir,
   .readdir      = xdp_fuse_readdir,
   .releasedir   = xdp_fuse_releasedir,
-  /*
   .fsyncdir     = xdp_fuse_fsyncdir,
+  /*
   .open         = xdp_fuse_open,
   .create       = xdp_fuse_create,
   .read         = xdp_fuse_read,
