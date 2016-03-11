@@ -61,8 +61,8 @@ struct _XdpInode {
   /* mutable data */
 
   GList *children; /* lazily filled, protected by inodes lock */
-  char *filename; /* variable (for non-dirs), protected by inodes lock,
-                     null if deleted */
+  char *filename; /* variable (for non-dirs), null if deleted,
+                     protected by inodes lock *and* mutex */
   gboolean is_doc; /* True if this is the document file for this dir */
 
   /* Used when the file is open, protected by mutex */
@@ -339,7 +339,7 @@ xdp_inode_lookup_child_unlocked (XdpInode *inode, const char *filename)
   for (l = inode->children; l != NULL; l = l->next)
     {
       XdpInode *child = l->data;
-      if (strcmp (child->filename, filename) == 0)
+      if (child->filename != NULL && strcmp (child->filename, filename) == 0)
         return xdp_inode_ref (child);
     }
 
@@ -351,6 +351,87 @@ xdp_inode_lookup_child (XdpInode *inode, const char *filename)
 {
   AUTOLOCK(inodes);
   return xdp_inode_lookup_child_unlocked (inode, filename);
+}
+
+static int
+xdp_inode_open_dir_fd (XdpInode *dir)
+{
+  struct stat st_buf;
+  glnx_fd_close int fd = -1;
+
+  g_assert (dir->dirname != NULL);
+
+  fd = open (dir->dirname, O_CLOEXEC | O_PATH | O_DIRECTORY);
+  if (fd == -1)
+    return -1;
+
+  if (fstat (fd, &st_buf) < 0)
+    {
+      errno = ENOENT;
+      return -1;
+    }
+
+  if (st_buf.st_ino != dir->dir_ino ||
+      st_buf.st_dev != dir->dir_dev)
+    {
+      errno = ENOENT;
+      return -1;
+    }
+
+  return glnx_steal_fd (&fd);
+}
+
+static XdpInode *
+xdp_inode_unlink_child (XdpInode *dir, const char *filename)
+{
+  XdpInode *child_inode;
+  glnx_fd_close int dir_fd = -1;
+
+  AUTOLOCK(inodes);
+  child_inode = xdp_inode_lookup_child_unlocked (dir, filename);
+  if (child_inode == NULL)
+    return NULL;
+
+  g_assert (child_inode->type == XDP_INODE_DOC_FILE);
+  g_assert (child_inode->filename != NULL);
+
+  /* Here we take *both* the inodes lock and the mutex.
+     The inodes lock is to make this safe against concurrent lookups,
+     but the mutex is to make it safe to access inode->filename inside
+     a mutex-only lock */
+  g_mutex_lock (&child_inode->mutex);
+
+  dir_fd = xdp_inode_open_dir_fd (dir);
+
+  if (dir_fd != -1)
+    {
+      if (child_inode->is_doc)
+        {
+          g_debug ("unlinking doc file %s", child_inode->filename);
+          unlinkat (dir_fd, child_inode->filename, 0);
+          if (child_inode->trunc_filename != NULL)
+            {
+              g_debug ("unlinking doc trunc_file %s", child_inode->trunc_filename);
+              unlinkat (dir_fd, child_inode->trunc_filename, 0);
+            }
+        }
+      else
+        {
+          unlinkat (dir_fd, child_inode->backing_filename, 0);
+        }
+    }
+
+  /* Zero out filename to mark it deleted */
+  g_free (child_inode->filename);
+  child_inode->filename = NULL;
+
+  /* Drop keep-alive-until-unlink ref */
+  if (!child_inode->is_doc)
+    xdp_inode_unref (child_inode);
+
+  g_mutex_unlock (&child_inode->mutex);
+
+  return child_inode;
 }
 
 /* NULL if removed */
@@ -404,34 +485,6 @@ create_tmp_for_doc (XdgAppDbEntry *entry, int dir_fd, int flags, int *fd_out)
   return g_steal_pointer (&template);
 }
 
-static int
-xdp_inode_open_dir (XdpInode *dir)
-{
-  struct stat st_buf;
-  glnx_fd_close int fd = -1;
-
-  g_assert (dir->dirname != NULL);
-
-  fd = open (dir->dirname, O_CLOEXEC | O_PATH | O_DIRECTORY);
-  if (fd == -1)
-    return -1;
-
-  if (fstat (fd, &st_buf) < 0)
-    {
-      errno = ENOENT;
-      return -1;
-    }
-
-  if (st_buf.st_ino != dir->dir_ino ||
-      st_buf.st_dev != dir->dir_dev)
-    {
-      errno = ENOENT;
-      return -1;
-    }
-
-  return glnx_steal_fd (&fd);
-}
-
 /* sets errno */
 static XdpInode *
 xdp_inode_create_file (XdpInode *dir,
@@ -474,7 +527,7 @@ xdp_inode_create_file (XdpInode *dir,
       return inode;
     }
 
-  dir_fd = xdp_inode_open_dir (dir);
+  dir_fd = xdp_inode_open_dir_fd (dir);
   if (dir_fd == -1)
     return NULL;
 
@@ -708,7 +761,7 @@ xdp_inode_stat (XdpInode *inode,
           res = fstat (fd, &tmp_stbuf);
         else
           {
-            glnx_fd_close int dir_fd = xdp_inode_open_dir (inode->parent);
+            glnx_fd_close int dir_fd = xdp_inode_open_dir_fd (inode->parent);
 
             if (dir_fd == -1)
               res = -1;
@@ -1167,20 +1220,24 @@ xdp_inode_locked_close_unneeded_fds (XdpInode *inode)
     {
       if (inode->truncated)
         {
-          fsync (inode->trunc_fd);
-          g_free (inode->backing_filename);
-          inode->backing_filename = g_strdup (inode->filename);
-          g_debug ("moving %s to %s", inode->trunc_filename, inode->backing_filename);
-          if (renameat (inode->dir_fd, inode->trunc_filename,
-                        inode->dir_fd, inode->backing_filename) != 0)
-            g_warning ("Unable to replace truncated document: %s", strerror (errno));
-
           if (inode->open_files != NULL && inode->fd != -1)
             {
               /* We're not going to close the ->fd, so we repoint it to the trunc_fd, but reopened O_RDONLY */
               g_autofree char *path = g_strdup_printf ("/proc/self/fd/%d", inode->trunc_fd);
               close (inode->fd);
               inode->fd = open (path, O_RDONLY|O_CLOEXEC);
+            }
+
+          if (inode->filename != NULL)
+            {
+              /* not removed, replace original */
+              fsync (inode->trunc_fd);
+              g_free (inode->backing_filename);
+              inode->backing_filename = g_strdup (inode->filename);
+              g_debug ("moving %s to %s", inode->trunc_filename, inode->backing_filename);
+              if (renameat (inode->dir_fd, inode->trunc_filename,
+                            inode->dir_fd, inode->backing_filename) != 0)
+                g_warning ("Unable to replace truncated document: %s", strerror (errno));
             }
 
           inode->truncated = FALSE;
@@ -1240,7 +1297,7 @@ xdp_inode_locked_ensure_fd_open (XdpInode *inode,
   /* Ensure all fds are open */
   if (inode->dir_fd == -1)
     {
-      inode->dir_fd = xdp_inode_open_dir (inode->parent);
+      inode->dir_fd = xdp_inode_open_dir_fd (inode->parent);
       if (inode->dir_fd == -1)
         return -1;
     }
@@ -1632,7 +1689,7 @@ xdp_fuse_setattr (fuse_req_t req,
             }
           else
             {
-              glnx_fd_close int dir_fd = xdp_inode_open_dir (inode->parent);
+              glnx_fd_close int dir_fd = xdp_inode_open_dir_fd (inode->parent);
               if (dir_fd == -1 ||
                   truncateat (dir_fd, inode->backing_filename, attr->st_size) != 0)
                 res = errno;
@@ -1759,10 +1816,43 @@ xdp_fuse_fsync (fuse_req_t req,
 static void
 xdp_fuse_unlink (fuse_req_t req,
                  fuse_ino_t parent,
-                 const char *name)
+                 const char *filename)
 {
-  g_debug ("xdp_fuse_unlink %lx/%s", parent, name);
-  fuse_reply_err (req, ENOSYS);
+  g_autoptr(XdpInode) parent_inode = NULL;
+  g_autoptr (XdgAppDbEntry) entry = NULL;
+  g_autoptr(XdpInode) child_inode = NULL;
+
+  g_debug ("xdp_fuse_unlink %lx/%s", parent, filename);
+
+  parent_inode = xdp_inode_lookup (parent);
+  if (parent_inode == NULL)
+    {
+      g_debug ("xdp_fuse_lookup <- error parent ENOENT");
+      fuse_reply_err (req, ENOENT);
+      return;
+    }
+
+  if (parent_inode->type == XDP_INODE_DOC_FILE)
+    {
+      fuse_reply_err (req, ENOTDIR);
+      return;
+    }
+
+  if (parent_inode->type != XDP_INODE_APP_DOC_DIR &&
+      parent_inode->type != XDP_INODE_DOC_DIR)
+    {
+      fuse_reply_err (req, EACCES);
+      return;
+    }
+
+  child_inode = xdp_inode_unlink_child (parent_inode, filename);
+  if (child_inode == NULL)
+    {
+      fuse_reply_err (req, ENOENT);
+      return;
+    }
+
+  fuse_reply_err (req, 0);
 }
 
 static void
