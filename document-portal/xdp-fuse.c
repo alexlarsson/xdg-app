@@ -761,7 +761,7 @@ xdp_inode_get_dir_unlocked (const char *app_id, const char *doc_id, XdgAppDbEntr
   inode = xdp_inode_new_unlocked (ino, type, parent, filename, app_id, doc_id);
   xdp_inode_unref_internal (parent, TRUE);
 
-  if (inode)
+  if (entry)
     {
       inode->dirname = xdp_entry_dup_dirname (entry);
       inode->dir_ino = xdp_entry_get_inode (entry);
