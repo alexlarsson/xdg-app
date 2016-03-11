@@ -2099,73 +2099,60 @@ static struct fuse_lowlevel_ops xdp_fuse_oper = {
   .rename       = xdp_fuse_rename,
 };
 
-/* Called when a apps permissions to see a document is changed */
+/* Called when a apps permissions to see a document is changed,
+   and with null opt_app_id when the doc is created/removed */
 void
-xdp_fuse_invalidate_doc_app (const char  *doc_id_s,
-                             const char  *app_id_s,
+xdp_fuse_invalidate_doc_app (const char  *doc_id,
+                             const char  *opt_app_id,
                              XdgAppDbEntry *entry)
 {
-#ifdef TODO
-  guint32 app_id = get_app_id_from_name (app_id_s);
-  guint32 doc_id = xdp_id_from_name (doc_id_s);
-  g_autofree char *basename = xdp_entry_dup_basename (entry);
-
-  g_debug ("invalidate %s/%s", doc_id_s, app_id_s);
+  g_autoptr(XdpInode) inode = NULL;
+  fuse_ino_t ino;
+  GList *l;
 
   /* This can happen if fuse is not initialized yet for the very
      first dbus message that activated the service */
   if (main_ch == NULL)
     return;
 
-  fuse_lowlevel_notify_inval_inode (main_ch, make_app_doc_file_inode (app_id, doc_id), 0, 0);
-  fuse_lowlevel_notify_inval_entry (main_ch, make_app_doc_dir_inode (app_id, doc_id),
-                                    basename, strlen (basename));
-  fuse_lowlevel_notify_inval_inode (main_ch, make_app_doc_dir_inode (app_id, doc_id), 0, 0);
-  fuse_lowlevel_notify_inval_entry (main_ch, make_inode (APP_DIR_INO_CLASS, app_id),
-                                    doc_id_s, strlen (doc_id_s));
-#endif
+  g_debug ("invalidate %s/%s", doc_id, opt_app_id ? opt_app_id : "*");
+
+  AUTOLOCK(inodes);
+  ino = get_dir_inode_nr_unlocked (opt_app_id, doc_id);
+  inode = xdp_inode_lookup_unlocked (ino);
+  if (inode != NULL)
+    {
+      fuse_lowlevel_notify_inval_inode (main_ch, inode->ino, 0, 0);
+      fuse_lowlevel_notify_inval_entry (main_ch, inode->parent->ino,
+                                        inode->filename, strlen (inode->filename));
+
+      for (l = inode->children; l != NULL; l = l->next)
+        {
+          XdpInode *child = l->data;
+
+          fuse_lowlevel_notify_inval_inode (main_ch, child->ino, 0, 0);
+          if (child->filename != NULL)
+            fuse_lowlevel_notify_inval_entry (main_ch, inode->ino,
+                                              child->filename, strlen (child->filename));
+        }
+    }
 }
 
-/* Called when a document id is created/removed */
-void
-xdp_fuse_invalidate_doc (const char  *doc_id_s,
-                         XdgAppDbEntry *entry)
+char *
+xdp_fuse_lookup_id_for_inode (ino_t ino)
 {
-#ifdef TODO
-  guint32 doc_id = xdp_id_from_name (doc_id_s);
-  g_autofree char *basename = xdp_entry_dup_basename (entry);
+  g_autoptr(XdpInode) inode = NULL;
 
-  g_debug ("invalidate %s", doc_id_s);
+  inode = xdp_inode_lookup (ino);
+  if (inode == NULL)
+    return NULL;
 
-  /* This can happen if fuse is not initialized yet for the very
-     first dbus message that activated the service */
-  if (main_ch == NULL)
-    return;
+  if (inode->type != XDP_INODE_DOC_FILE ||
+      !inode->is_doc)
+    return NULL;
 
-  fuse_lowlevel_notify_inval_inode (main_ch, make_app_doc_file_inode (0, doc_id), 0, 0);
-  fuse_lowlevel_notify_inval_entry (main_ch, make_app_doc_dir_inode (0, doc_id),
-                                    basename, strlen (basename));
-  fuse_lowlevel_notify_inval_inode (main_ch, make_app_doc_dir_inode (0, doc_id), 0, 0);
-  fuse_lowlevel_notify_inval_entry (main_ch, FUSE_ROOT_ID, doc_id_s, strlen (doc_id_s));
-#endif
+  return g_strdup (inode->doc_id);
 }
-
-guint32
-xdp_fuse_lookup_id_for_inode (ino_t inode)
-{
-#ifdef TODO
-  XdpInodeClass class = get_class (inode);
-  guint64 class_ino = get_class_ino (inode);
-
-  if (class != APP_DOC_FILE_INO_CLASS)
-    return 0;
-
-  return get_doc_id_from_app_doc_ino (class_ino);
-#else
-  return 0;
-#endif
-}
-
 
 const char *
 xdp_fuse_get_mountpoint (void)

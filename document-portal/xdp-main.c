@@ -231,7 +231,7 @@ portal_delete (GDBusMethodInvocation *invocation,
   old_apps = xdg_app_db_entry_list_apps (entry);
   for (i = 0; old_apps[i] != NULL; i++)
     xdp_fuse_invalidate_doc_app (id, old_apps[i], entry);
-  xdp_fuse_invalidate_doc (id, entry);
+  xdp_fuse_invalidate_doc_app (id, NULL, entry);
 
   if (persist_entry (entry))
     xdg_app_permission_store_call_delete (permission_store, TABLE_NAME,
@@ -284,7 +284,7 @@ do_create_doc (struct stat *parent_st_buf, const char *path, gboolean reuse_exis
   entry = xdg_app_db_entry_new (data);
   xdg_app_db_set_entry (db, id, entry);
 
-  xdp_fuse_invalidate_doc (id, entry);
+  xdp_fuse_invalidate_doc_app (id, NULL, entry);
 
   if (persistent)
     xdg_app_permission_store_call_set (permission_store,
@@ -381,20 +381,17 @@ portal_add (GDBusMethodInvocation *invocation,
   if (st_buf.st_dev == fuse_dev)
     {
       /* The passed in fd is on the fuse filesystem itself */
-      guint32 old_id;
       g_autoptr(XdgAppDbEntry) old_entry = NULL;
 
-      old_id = xdp_fuse_lookup_id_for_inode (st_buf.st_ino);
-      g_debug ("path on fuse, id %x\n", old_id);
-      if (old_id == 0)
+      id = xdp_fuse_lookup_id_for_inode (st_buf.st_ino);
+      g_debug ("path on fuse, id %s\n", id);
+      if (id == NULL)
         {
           g_dbus_method_invocation_return_error (invocation,
                                                  XDG_APP_PORTAL_ERROR, XDG_APP_PORTAL_ERROR_INVALID_ARGUMENT,
                                                  "Invalid fd passed");
           return;
         }
-
-      id = xdp_name_from_id (old_id);
 
       /* If the entry doesn't exist anymore, fail.  Also fail if not
          resuse_existing, because otherwise the user could use this to
