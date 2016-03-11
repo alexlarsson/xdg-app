@@ -600,13 +600,13 @@ xdp_inode_ensure_document_file (XdpInode *dir,
 }
 
 static char *
-create_tmp_for_doc (XdgAppDbEntry *entry, int dir_fd, int flags, int *fd_out)
+create_tmp_for_doc (XdgAppDbEntry *entry, int dir_fd, int flags, mode_t mode, int *fd_out)
 {
   g_autofree char *basename = xdp_entry_dup_basename (entry);
   g_autofree char *template = g_strconcat (".xdp_", basename, ".XXXXXX", NULL);
   int fd;
 
-  fd = xdg_app_mkstempat (dir_fd, template, flags|O_CLOEXEC, 0600);
+  fd = xdg_app_mkstempat (dir_fd, template, flags|O_CLOEXEC, mode);
   if (fd == -1)
     return NULL;
 
@@ -676,13 +676,13 @@ xdp_inode_create_file (XdpInode *dir,
       if (fd < 0)
         return NULL;
 
-      trunc_filename = create_tmp_for_doc (entry, dir_fd, O_RDWR, &trunc_fd);
+      trunc_filename = create_tmp_for_doc (entry, dir_fd, O_RDWR, mode & 0777, &trunc_fd);
       if (trunc_filename == NULL)
         return NULL;
     }
   else
     {
-      backing_filename = create_tmp_for_doc (entry, dir_fd, O_RDWR, &fd);
+      backing_filename = create_tmp_for_doc (entry, dir_fd, O_RDWR, mode & 0777, &fd);
       if (backing_filename == NULL)
         return NULL;
     }
@@ -1453,8 +1453,14 @@ xdp_inode_locked_ensure_fd_open (XdpInode *inode,
 
   if (inode->is_doc && for_write && inode->trunc_fd == -1)
     {
+      struct stat st_buf;
+      mode_t mode = 0600;
+
+      if (fstat (inode->fd, &st_buf) == 0)
+        mode = get_user_perms (&st_buf);
+
       g_assert (inode->trunc_filename == NULL);
-      inode->trunc_filename = create_tmp_for_doc (entry, inode->dir_fd, O_RDWR,
+      inode->trunc_filename = create_tmp_for_doc (entry, inode->dir_fd, O_RDWR, mode,
                                                   &inode->trunc_fd);
       if (inode->trunc_filename == NULL)
         return -1;
@@ -1825,6 +1831,18 @@ xdp_fuse_setattr (fuse_req_t req,
             }
         }
       g_mutex_unlock (&inode->mutex);
+    }
+  else if (to_set == FUSE_SET_ATTR_MODE)
+    {
+      if (!can_write)
+        res = EACCES;
+      else
+        {
+          int fd = xdp_inode_locked_get_write_fd (inode);
+          if (fd == -1 ||
+              fchmod (fd, get_user_perms (attr)) != 0)
+            res = errno;
+        }
     }
   else
     res = ENOSYS;
