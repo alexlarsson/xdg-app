@@ -74,9 +74,6 @@ struct _XdpInode {
   char *trunc_filename;
   int trunc_fd;
   gboolean truncated;
-#ifdef TODO
-  gboolean readonly; /* TODO: set to true on source tmpfile renamed to final dest. Needs rethinking */
-#endif
 };
 
 typedef struct _XdpFile XdpFile;
@@ -104,6 +101,13 @@ static struct fuse_session *session = NULL;
 static struct fuse_chan *main_ch = NULL;
 static char *mount_path = NULL;
 static pthread_t fuse_pthread = 0;
+
+static int
+reopen_fd (int fd, int flags)
+{
+  g_autofree char *path = g_strdup_printf ("/proc/self/fd/%d", fd);
+  return open (path, flags | O_CLOEXEC);
+}
 
 /* Call with inodes lock held */
 static fuse_ino_t
@@ -381,6 +385,47 @@ xdp_inode_open_dir_fd (XdpInode *dir)
   return glnx_steal_fd (&fd);
 }
 
+static void
+xdp_inode_unlink_backing_files (XdpInode *child_inode, int dir_fd)
+{
+  if (dir_fd == -1)
+    {
+      g_debug ("Can't unlink child inode due to no dir_fd");
+      return;
+    }
+
+  if (child_inode->is_doc)
+    {
+      g_debug ("unlinking doc file %s", child_inode->filename);
+      unlinkat (dir_fd, child_inode->filename, 0);
+      if (child_inode->trunc_filename != NULL)
+        {
+          g_debug ("unlinking doc trunc_file %s", child_inode->trunc_filename);
+          unlinkat (dir_fd, child_inode->trunc_filename, 0);
+        }
+    }
+  else
+    {
+      g_debug ("unlinking tmp_file %s", child_inode->backing_filename);
+      unlinkat (dir_fd, child_inode->backing_filename, 0);
+    }
+}
+
+static void
+xdp_inode_do_unlink (XdpInode *child_inode, int dir_fd, gboolean unlink_backing)
+{
+  if (unlink_backing)
+    xdp_inode_unlink_backing_files (child_inode, dir_fd);
+
+  /* Zero out filename to mark it deleted */
+  g_free (child_inode->filename);
+  child_inode->filename = NULL;
+
+  /* Drop keep-alive-until-unlink ref */
+  if (!child_inode->is_doc)
+    xdp_inode_unref (child_inode);
+}
+
 static XdpInode *
 xdp_inode_unlink_child (XdpInode *dir, const char *filename)
 {
@@ -403,35 +448,120 @@ xdp_inode_unlink_child (XdpInode *dir, const char *filename)
 
   dir_fd = xdp_inode_open_dir_fd (dir);
 
-  if (dir_fd != -1)
-    {
-      if (child_inode->is_doc)
-        {
-          g_debug ("unlinking doc file %s", child_inode->filename);
-          unlinkat (dir_fd, child_inode->filename, 0);
-          if (child_inode->trunc_filename != NULL)
-            {
-              g_debug ("unlinking doc trunc_file %s", child_inode->trunc_filename);
-              unlinkat (dir_fd, child_inode->trunc_filename, 0);
-            }
-        }
-      else
-        {
-          unlinkat (dir_fd, child_inode->backing_filename, 0);
-        }
-    }
-
-  /* Zero out filename to mark it deleted */
-  g_free (child_inode->filename);
-  child_inode->filename = NULL;
-
-  /* Drop keep-alive-until-unlink ref */
-  if (!child_inode->is_doc)
-    xdp_inode_unref (child_inode);
+  xdp_inode_do_unlink (child_inode, dir_fd, TRUE);
 
   g_mutex_unlock (&child_inode->mutex);
 
   return child_inode;
+}
+
+/* Sets errno */
+static int
+xdp_inode_rename_child (XdpInode *dir,
+                        const char *src_filename,
+                        const char *dst_filename,
+                        const char *doc_basename)
+{
+  g_autoptr(XdpInode) src_inode = NULL;
+  g_autoptr(XdpInode) dst_inode = NULL;
+  glnx_fd_close int dir_fd = -1;
+  int res;
+
+  AUTOLOCK(inodes);
+  src_inode = xdp_inode_lookup_child_unlocked (dir, src_filename);
+  if (src_inode == NULL)
+    {
+      errno = ENOENT;
+      return -1;
+    }
+
+  g_assert (src_inode->type == XDP_INODE_DOC_FILE);
+  g_assert (src_inode->filename != NULL);
+
+  dst_inode = xdp_inode_lookup_child_unlocked (dir, dst_filename);
+  if (dst_inode)
+    {
+      g_assert (dst_inode->type == XDP_INODE_DOC_FILE);
+      g_assert (dst_inode->filename != NULL);
+    }
+
+  /* Here we take *both* the inodes lock and the mutex.
+     The inodes lock is to make this safe against concurrent lookups,
+     but the mutex is to make it safe to access inode->filename inside
+     a mutex-only lock */
+  g_mutex_lock (&src_inode->mutex);
+  if (dst_inode)
+    g_mutex_lock (&dst_inode->mutex);
+
+  dir_fd = xdp_inode_open_dir_fd (dir);
+  res = 0;
+
+  if (src_inode->is_doc)
+    {
+      /* doc -> tmp */
+
+      /* We don't want to allow renaming an exiting doc file, because
+         doing so would make a tmpfile of the real doc-file which some
+         host-side app may have open. You have to make a copy and
+         remove instead. */
+      errno = EACCES;
+      res = -1;
+    }
+  else if (strcmp (dst_filename, doc_basename) != 0)
+    {
+      /* tmp -> tmp */
+
+      if (dst_inode)
+        xdp_inode_do_unlink (dst_inode, dir_fd, TRUE);
+
+      g_free (src_inode->filename);
+      src_inode->filename = g_strdup (dst_filename);
+    }
+  else
+    {
+      /* tmp -> doc */
+
+      g_debug ("atomic renaming %s to %s", src_inode->backing_filename, dst_filename);
+      res = renameat (dir_fd, src_inode->backing_filename,
+                      dir_fd, dst_filename);
+      if (res == 0)
+        {
+          if (dst_inode != NULL)
+            {
+              /* Unlink, but don't remove backing files, which are now the new one */
+              xdp_inode_do_unlink (dst_inode, dir_fd, FALSE);
+
+              /* However, unlink trunc_file if its there */
+              if (dst_inode->trunc_filename)
+                unlinkat (dir_fd, dst_inode->trunc_filename, 0);
+            }
+
+          src_inode->is_doc = TRUE;
+          g_free (src_inode->filename);
+          src_inode->filename = g_strdup (dst_filename);
+          g_free (src_inode->backing_filename);
+          src_inode->backing_filename = g_strdup (dst_filename);
+
+          /* Convert ->fd to read-only */
+          if (src_inode->fd != -1)
+            {
+              int new_fd = reopen_fd (src_inode->fd, O_RDONLY);
+              close (src_inode->fd);
+              src_inode->fd = new_fd;
+            }
+
+          /* This neuters any outstanding write files, since we have no trunc_fd at this point.
+             However, that is not really a problem, we would not support them well anyway as
+             a newly opened trunc file would have to have a truncate operation initially for
+             it to work anyway */
+        }
+    }
+
+  g_mutex_unlock (&src_inode->mutex);
+  if (dst_inode)
+    g_mutex_unlock (&dst_inode->mutex);
+
+  return res;
 }
 
 /* NULL if removed */
@@ -1223,9 +1353,8 @@ xdp_inode_locked_close_unneeded_fds (XdpInode *inode)
           if (inode->open_files != NULL && inode->fd != -1)
             {
               /* We're not going to close the ->fd, so we repoint it to the trunc_fd, but reopened O_RDONLY */
-              g_autofree char *path = g_strdup_printf ("/proc/self/fd/%d", inode->trunc_fd);
               close (inode->fd);
-              inode->fd = open (path, O_RDONLY|O_CLOEXEC);
+              inode->fd = reopen_fd (inode->trunc_fd, O_RDONLY);
             }
 
           if (inode->filename != NULL)
@@ -1862,8 +1991,75 @@ xdp_fuse_rename (fuse_req_t req,
                  fuse_ino_t newparent,
                  const char *newname)
 {
+  g_autoptr(XdpInode) parent_inode = NULL;
+  g_autoptr (XdgAppDbEntry) entry = NULL;
+  g_autofree char *basename = NULL;
+  gboolean can_see, can_write;
+
   g_debug ("xdp_fuse_rename %lx/%s -> %lx/%s", parent, name, newparent, newname);
-  fuse_reply_err (req, ENOSYS);
+
+  parent_inode = xdp_inode_lookup (parent);
+  if (parent_inode == NULL)
+    {
+      g_debug ("xdp_fuse_rename <- error parent ENOENT");
+      fuse_reply_err (req, ENOENT);
+      return;
+    }
+
+  if (parent_inode->type == XDP_INODE_DOC_FILE)
+    {
+      fuse_reply_err (req, ENOTDIR);
+      return;
+    }
+
+  if (parent_inode->type != XDP_INODE_APP_DOC_DIR &&
+      parent_inode->type != XDP_INODE_DOC_DIR)
+    {
+      fuse_reply_err (req, EACCES);
+      return;
+    }
+
+  if (newparent != parent)
+    {
+      g_debug ("xdp_fuse_rename <- error different parents EACCES");
+      fuse_reply_err (req, EACCES);
+      return;
+    }
+
+  if (strcmp (name, newname) == 0)
+    {
+      fuse_reply_err (req, 0);
+      return;
+    }
+
+  entry = xdp_lookup_doc (parent_inode->doc_id);
+  if (entry == NULL)
+    {
+      fuse_reply_err (req, ENOENT);
+      return;
+    }
+
+  can_see = app_can_see_doc (entry, parent_inode->app_id);
+  can_write = app_can_write_doc (entry, parent_inode->app_id);
+
+  if (!can_see)
+    {
+      fuse_reply_err (req, ENOENT);
+      return;
+    }
+
+  if (!can_write)
+    {
+      fuse_reply_err (req, EACCES);
+      return;
+    }
+
+  basename = xdp_entry_dup_basename (entry);
+
+  if (xdp_inode_rename_child (parent_inode, name, newname, basename) != 0)
+    fuse_reply_err (req, errno);
+  else
+    fuse_reply_err (req, 0);
 }
 static struct fuse_lowlevel_ops xdp_fuse_oper = {
   .lookup       = xdp_fuse_lookup,
