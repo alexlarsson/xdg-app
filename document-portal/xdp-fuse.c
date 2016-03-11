@@ -1733,7 +1733,25 @@ xdp_fuse_fsync (fuse_req_t req,
   fuse_reply_err (req, res);
 }
 
+static void
+xdp_fuse_unlink (fuse_req_t req,
+                 fuse_ino_t parent,
+                 const char *name)
+{
+  g_debug ("xdp_fuse_unlink %lx/%s", parent, name);
+  fuse_reply_err (req, ENOSYS);
+}
 
+static void
+xdp_fuse_rename (fuse_req_t req,
+                 fuse_ino_t parent,
+                 const char *name,
+                 fuse_ino_t newparent,
+                 const char *newname)
+{
+  g_debug ("xdp_fuse_rename %lx/%s -> %lx/%s", parent, name, newparent, newname);
+  fuse_reply_err (req, ENOSYS);
+}
 static struct fuse_lowlevel_ops xdp_fuse_oper = {
   .lookup       = xdp_fuse_lookup,
   .forget       = xdp_fuse_forget,
@@ -1750,10 +1768,8 @@ static struct fuse_lowlevel_ops xdp_fuse_oper = {
   .write_buf    = xdp_fuse_write_buf,
   .fsync        = xdp_fuse_fsync,
   .create       = xdp_fuse_create,
-  /*
-  .rename       = xdp_fuse_rename,
   .unlink       = xdp_fuse_unlink,
-  */
+  .rename       = xdp_fuse_rename,
 };
 
 /* Called when a apps permissions to see a document is changed */
