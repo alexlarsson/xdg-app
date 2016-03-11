@@ -53,6 +53,11 @@ struct _XdpInode {
   char *app_id;
   char *doc_id;
 
+  /* For doc dirs */
+  char *dirname;
+  dev_t dir_dev;
+  ino_t dir_ino;
+
   /* mutable data */
 
   GList *children; /* lazily filled, protected by inodes lock */
@@ -194,6 +199,7 @@ xdp_inode_destroy (XdpInode *inode, gboolean locked)
   xdp_inode_unref_internal (inode->parent, locked);
   g_free (inode->backing_filename);
   g_free (inode->filename);
+  g_free (inode->dirname);
   g_free (inode->app_id);
   g_free (inode->doc_id);
   g_free (inode);
@@ -398,6 +404,34 @@ create_tmp_for_doc (XdgAppDbEntry *entry, int dir_fd, int flags, int *fd_out)
   return g_steal_pointer (&template);
 }
 
+static int
+xdp_inode_open_dir (XdpInode *dir)
+{
+  struct stat st_buf;
+  glnx_fd_close int fd = -1;
+
+  g_assert (dir->dirname != NULL);
+
+  fd = open (dir->dirname, O_CLOEXEC | O_PATH | O_DIRECTORY);
+  if (fd == -1)
+    return -1;
+
+  if (fstat (fd, &st_buf) < 0)
+    {
+      errno = ENOENT;
+      return -1;
+    }
+
+  if (st_buf.st_ino != dir->dir_ino ||
+      st_buf.st_dev != dir->dir_dev)
+    {
+      errno = ENOENT;
+      return -1;
+    }
+
+  return glnx_steal_fd (&fd);
+}
+
 /* sets errno */
 static XdpInode *
 xdp_inode_create_file (XdpInode *dir,
@@ -440,7 +474,7 @@ xdp_inode_create_file (XdpInode *dir,
       return inode;
     }
 
-  dir_fd = xdp_entry_open_dir (entry);
+  dir_fd = xdp_inode_open_dir (dir);
   if (dir_fd == -1)
     return NULL;
 
@@ -504,7 +538,7 @@ xdp_inode_lookup (fuse_ino_t inode_nr)
 }
 
 static XdpInode *
-xdp_inode_get_dir_unlocked (const char *app_id, const char *doc_id)
+xdp_inode_get_dir_unlocked (const char *app_id, const char *doc_id, XdgAppDbEntry *entry)
 {
   fuse_ino_t ino;
   XdpInode *inode;
@@ -535,7 +569,7 @@ xdp_inode_get_dir_unlocked (const char *app_id, const char *doc_id)
         }
       else
         {
-          parent = xdp_inode_get_dir_unlocked (app_id, NULL);
+          parent = xdp_inode_get_dir_unlocked (app_id, NULL, NULL);
           filename = doc_id;
           type = XDP_INODE_APP_DOC_DIR;
         }
@@ -543,14 +577,22 @@ xdp_inode_get_dir_unlocked (const char *app_id, const char *doc_id)
 
   inode = xdp_inode_new_unlocked (ino, type, parent, filename, app_id, doc_id);
   xdp_inode_unref_internal (parent, TRUE);
+
+  if (inode)
+    {
+      inode->dirname = xdp_entry_dup_dirname (entry);
+      inode->dir_ino = xdp_entry_get_inode (entry);
+      inode->dir_dev = xdp_entry_get_device (entry);
+    }
+
   return inode;
 }
 
 static XdpInode *
-xdp_inode_get_dir (const char *app_id, const char *doc_id)
+xdp_inode_get_dir (const char *app_id, const char *doc_id, XdgAppDbEntry *entry)
 {
   AUTOLOCK(inodes);
-  return xdp_inode_get_dir_unlocked (app_id, doc_id);
+  return xdp_inode_get_dir_unlocked (app_id, doc_id, entry);
 }
 
 /********************************************************************** \
@@ -641,12 +683,10 @@ xdp_inode_stat (XdpInode *inode,
         g_autoptr (XdgAppDbEntry) entry = NULL;
         struct stat tmp_stbuf;
         gboolean can_see, can_write;
-        g_autofree char *filename = NULL;
         int fd, res, errsv;
 
-        filename = xdp_inode_get_filename (inode);
         entry = xdp_lookup_doc (inode->doc_id);
-        if (entry == NULL || filename == NULL)
+        if (entry == NULL)
           {
             errno = ENOENT;
             return -1;
@@ -667,8 +707,15 @@ xdp_inode_stat (XdpInode *inode,
         if (fd != -1)
           res = fstat (fd, &tmp_stbuf);
         else
-          res = xdp_entry_stat (entry, inode->backing_filename,
-                                &tmp_stbuf, AT_SYMLINK_NOFOLLOW);
+          {
+            glnx_fd_close int dir_fd = xdp_inode_open_dir (inode->parent);
+
+            if (dir_fd == -1)
+              res = -1;
+            else
+              res = fstatat (dir_fd, inode->backing_filename,
+                             &tmp_stbuf, AT_SYMLINK_NOFOLLOW);
+          }
         errsv = errno;
 
         g_mutex_unlock (&inode->mutex);
@@ -733,21 +780,21 @@ xdp_fuse_lookup (fuse_req_t req,
         {
           entry = xdp_lookup_doc (name);
           if (entry != NULL)
-            child_inode = xdp_inode_get_dir (NULL, name);
+            child_inode = xdp_inode_get_dir (NULL, name, entry);
         }
       break;
 
     case XDP_INODE_BY_APP:
       /* This lazily creates the app dir */
       if (xdg_app_is_valid_name (name))
-        child_inode = xdp_inode_get_dir (name, NULL);
+        child_inode = xdp_inode_get_dir (name, NULL, NULL);
       break;
 
     case XDP_INODE_APP_DIR:
       entry = xdp_lookup_doc (name);
       if (entry != NULL &&
           app_can_see_doc (entry, parent_inode->app_id))
-        child_inode = xdp_inode_get_dir (parent_inode->app_id, name);
+        child_inode = xdp_inode_get_dir (parent_inode->app_id, name, entry);
       break;
 
     case XDP_INODE_APP_DOC_DIR:
@@ -1038,37 +1085,6 @@ xdp_fuse_getattr (fuse_req_t req,
       return;
     }
 
-#ifdef TODO
-  g_autoptr(XdpFh) fh = NULL;
-  int res;
-
-  /* Fuse passes fi in to verify EOF during read/write/seek, but not during fstat */
-  if (fi != NULL)
-    {
-      XdpFh *fh = (gpointer)fi->fh;
-
-      res = xdp_fh_fstat_locked (fh, &stbuf);
-      if (res == 0)
-        {
-          fuse_reply_attr (req, &stbuf, get_attr_cache_time (stbuf.st_mode));
-          return;
-        }
-    }
-
-
-  fh = find_open_fh (ino);
-  if (fh)
-    {
-      res = xdp_fh_fstat_locked (fh, &stbuf);
-      if (res == 0)
-        {
-          fuse_reply_attr (req, &stbuf, get_attr_cache_time (stbuf.st_mode));
-          return;
-        }
-    }
-
-#endif
-
   if (xdp_inode_stat (inode,  &stbuf) != 0)
     {
       fuse_reply_err (req, errno);
@@ -1224,7 +1240,7 @@ xdp_inode_locked_ensure_fd_open (XdpInode *inode,
   /* Ensure all fds are open */
   if (inode->dir_fd == -1)
     {
-      inode->dir_fd = xdp_entry_open_dir (entry);
+      inode->dir_fd = xdp_inode_open_dir (inode->parent);
       if (inode->dir_fd == -1)
         return -1;
     }
@@ -1305,7 +1321,7 @@ xdp_fuse_open (fuse_req_t req,
 
   if (open_mode != O_RDONLY && !can_write)
     {
-      g_debug ("xdp_fuse_open <- no write EACCESS");
+      g_debug ("xdp_fuse_open <- no write EACCES");
       fuse_reply_err (req, EACCES);
       return;
     }
@@ -1557,6 +1573,13 @@ xdp_fuse_setattr (fuse_req_t req,
       return;
     }
 
+  if (inode->type != XDP_INODE_DOC_FILE)
+    {
+      g_debug ("xdp_fuse_setattr <- not file ENOSYS");
+      fuse_reply_err (req, ENOSYS);
+      return;
+    }
+
   entry = xdp_lookup_doc (inode->doc_id);
   if (entry == NULL ||
       !app_can_see_doc (entry, inode->app_id))
@@ -1609,7 +1632,7 @@ xdp_fuse_setattr (fuse_req_t req,
             }
           else
             {
-              glnx_fd_close int dir_fd = xdp_entry_open_dir (entry);
+              glnx_fd_close int dir_fd = xdp_inode_open_dir (inode->parent);
               if (dir_fd == -1 ||
                   truncateat (dir_fd, inode->backing_filename, attr->st_size) != 0)
                 res = errno;
