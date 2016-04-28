@@ -251,7 +251,7 @@ build_bundle (OstreeRepo *repo, GFile *file,
   return TRUE;
 }
 
-#ifdef HAVE_LIBARCHIVE
+#if defined(HAVE_LIBARCHIVE) && defined(HAVE_OSTREE_EXPORT_PATH_PREFIX)
 
 GLNX_DEFINE_CLEANUP_FUNCTION(void*, xdg_app_local_free_read_archive, archive_read_free)
 #define free_read_archive __attribute__ ((cleanup(xdg_app_local_free_read_archive)))
@@ -410,7 +410,15 @@ build_oci (OstreeRepo *repo, GFile *file,
            const char *name, const char *full_branch,
            GCancellable *cancellable, GError **error)
 {
-#ifdef HAVE_LIBARCHIVE
+#if !defined(HAVE_OSTREE_EXPORT_PATH_PREFIX)
+  g_set_error (error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
+               "This version of ostree is to old to support OCI exports");
+  return FALSE;
+#elif !defined(HAVE_LIBARCHIVE)
+  g_set_error (error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
+               "This version of xdg-app is not compiled with libarchive support");
+  return FALSE;
+#else
   struct free_write_archive archive *a = NULL;
   OstreeRepoExportArchiveOptions opts = { 0, };
   g_autoptr(GFile) root = NULL;
@@ -526,10 +534,6 @@ build_oci (OstreeRepo *repo, GFile *file,
     return propagate_libarchive_error (error, a);
 
   return TRUE;
-#else
-  g_set_error (error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
-               "This version of xdg-app is not compiled with libarchive support");
-  return FALSE;
 #endif
 }
 
