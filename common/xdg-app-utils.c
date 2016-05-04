@@ -168,6 +168,14 @@ xdg_app_get_kernel_arch (void)
   if (arch != NULL)
     return arch;
 
+  /* Avoid using uname is the user's architecture is 32 bit as it
+   * can get the wrong value. E.g.: when the kernel has a
+   * different architecture than the user space */
+#if defined(__i386__)
+  arch = "i386";
+  return arch;
+#endif
+
   if (uname (&buf))
     {
       arch = "unknown";
