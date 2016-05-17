@@ -7,7 +7,7 @@ TESTS_ENVIRONMENT += OT_TESTS_DEBUG=1 \
 	PATH=$$(cd $(top_builddir) && pwd):$${PATH} \
 	$(NULL)
 
-testdb_CFLAGS = $(BASE_CFLAGS) -DDB_DIR=\"$(abs_srcdir)/tests/dbs\"
+testdb_CFLAGS = $(BASE_CFLAGS)
 testdb_LDADD = \
              $(BASE_LIBS) \
              $(OSTREE_LIBS) \
@@ -16,7 +16,7 @@ testdb_LDADD = \
              $(NULL)
 testdb_SOURCES = tests/testdb.c
 
-test_doc_portal_CFLAGS = $(BASE_CFLAGS) -DTEST_SERVICES=\""$(abs_top_builddir)/tests/services"\" -DDOC_PORTAL=\""$(abs_top_builddir)/xdg-document-portal"\"
+test_doc_portal_CFLAGS = $(BASE_CFLAGS)
 test_doc_portal_LDADD = \
              $(BASE_LIBS) \
              $(OSTREE_LIBS) \
@@ -57,18 +57,23 @@ tests/test-basic.sh: tests/package_version.txt
 installed_test_SCRIPTS += \
 	buildutil/tap-driver.sh \
 	tests/test-configure \
-	tests/package_version.txt \
 	tests/make-test-app.sh \
 	tests/make-test-runtime.sh \
 	tests/make-test-bundles.sh \
-	tests/libtest.sh \
 	$(NULL)
 
 installed_test_data = \
+	tests/libtest.sh \
 	tests/org.test.Hello.png \
+	tests/package_version.txt \
 	tests/test.json \
 	tests/session.conf.in \
 	$(NULL)
+
+installed_test_dbsdir = $(installed_testdir)/dbs
+if ENABLE_INSTALLED_TESTS
+installed_test_dbs_DATA = tests/dbs/no_tables
+endif
 
 EXTRA_DIST += $(installed_test_SCRIPTS) $(installed_test_data)
 
